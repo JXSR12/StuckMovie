@@ -166,7 +166,7 @@ export default function Topbar(props: TopbarProps) {
           setUnreadNotifCount(unreadNotifCount+1);
         }
         setNotifCount(notifCount+1);
-        return {id: item.id, eid: item.data().eid, title: item.data().title, message: item.data().message, time: item.data().message, isRead: item.data().isRead};
+        return {id: item.id, eid: item.data().eid, title: item.data().title, message: item.data().message, time: item.data().time, isRead: item.data().isRead};
       }));
     })
   }
@@ -210,7 +210,7 @@ export default function Topbar(props: TopbarProps) {
                   <Typography
                   variant="caption"
                   color="textPrimary">
-                    {timeAgo.format(Date.now() - 50*1000)}
+                    {timeAgo.format(notif.time.seconds*1000)}
                   </Typography>
                 </React.Fragment>
               }

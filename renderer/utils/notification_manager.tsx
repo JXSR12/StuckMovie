@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDocs, query, Timestamp, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, doc, getDocs, orderBy, query, Timestamp, updateDoc, where } from 'firebase/firestore';
 import { database } from '../database/firebase';
 
 const db_notifications = collection(database, 'notifications');
@@ -22,7 +22,7 @@ export class Notification {
     }
 
     static async getNotifications (eid: string){
-        const q = query(db_notifications, where('eid', '==', eid));
+        const q = query(db_notifications, where('eid', '==', eid), orderBy('time'));
         const promise = await getDocs(q);
 
         return promise;
