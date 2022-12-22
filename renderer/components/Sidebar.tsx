@@ -11,7 +11,9 @@ import ListItem from '@material-ui/core/ListItem';
 import ListItemIcon from '@material-ui/core/ListItemIcon';
 import ListItemText from '@material-ui/core/ListItemText';
 import InboxIcon from '@material-ui/icons/MoveToInbox';
+import Chip from '@material-ui/core/Chip';
 import MailIcon from '@material-ui/icons/Mail';
+import AppsIcon from '@material-ui/icons/Apps';
 import Topbar from './Topbar';
 import PeopleRoundedIcon from '@material-ui/icons/PeopleRounded'
 import LocalMoviesIcon from '@material-ui/icons/LocalMovies';
@@ -60,14 +62,17 @@ const useStyles = makeStyles((theme: Theme) =>
 export interface SidebarProps {
   handleOpenDrawerParent: () => void;
   handleLogOut: () => void;
+  handleSearchClick: () => void;
+  handleSearch: (search: string) => void;
   handleSidebarButton: (key: string) => void;
   isManagement: boolean;
+  isManagementReq: boolean;
 }
 
 export default function Sidebar(props: SidebarProps) {
   const classes = useStyles();
   const [openDrawer, setOpenDrawer] = React.useState(true);
-  const { handleOpenDrawerParent, handleLogOut, handleSidebarButton, isManagement} = props;
+  const { handleOpenDrawerParent, handleLogOut, handleSidebarButton, handleSearch, handleSearchClick, isManagement, isManagementReq} = props;
 
   const handleOpenDrawer = () =>{
     setOpenDrawer(!openDrawer);
@@ -78,7 +83,7 @@ export default function Sidebar(props: SidebarProps) {
     <div className={classes.root}>
       
       <CssBaseline />
-      <Topbar handleLogOut={handleLogOut} handleOpenDrawer={handleOpenDrawer}/>
+      <Topbar handleSearchClick={handleSearchClick} handleSearch={handleSearch} handleLogOut={handleLogOut} handleOpenDrawer={handleOpenDrawer}/>
       <Drawer
         open={openDrawer}
         className={classes.drawer}
@@ -89,26 +94,78 @@ export default function Sidebar(props: SidebarProps) {
       >
         <Toolbar />
         <div className={classes.drawerContainer}>
+          <Divider component={'li'} className={classes.drawerDivider}/>
+            <li>
+              <Typography
+                color="primary"
+                display="block"
+                variant="caption"
+                align="center"
+              >
+                <Chip label="Operations"/>
+              </Typography>
+            </li>
           <List>
-            {['Movies', 'Theaters', 'Schedules'].map((text, index) => (
-              <ListItem button key={text} className={classes.drawerItem}>
-                <ListItemIcon className={classes.drawerItem}>{index == 0 ? <LocalMoviesIcon/> : index == 1 ? <MeetingRoomIcon/> : <TodayIcon/>}</ListItemIcon>
-                <ListItemText primary={text} className={classes.drawerItem}/>
-              </ListItem>
-            ))}
+            <ListItem button key={'Movies'} className={classes.drawerItem}>
+                <ListItemIcon className={classes.drawerItem}><LocalMoviesIcon/></ListItemIcon>
+                <ListItemText primary={'Movies'} className={classes.drawerItem}/>
+            </ListItem>
+            <ListItem button key={'Theatres'} className={classes.drawerItem}>
+                <ListItemIcon className={classes.drawerItem}><MeetingRoomIcon/></ListItemIcon>
+                <ListItemText primary={'Theatres'} className={classes.drawerItem}/>
+            </ListItem>
+            <ListItem button key={'Schedules'} className={classes.drawerItem}>
+                <ListItemIcon className={classes.drawerItem}><TodayIcon/></ListItemIcon>
+                <ListItemText primary={'Schedules'} className={classes.drawerItem}/>
+            </ListItem>
           </List>
-          <Divider className={classes.drawerDivider}/>
           
           {isManagement && (
+            <div>
+            <Divider component={'li'} className={classes.drawerDivider}/>
+            <li>
+              <Typography
+                color="primary"
+                display="block"
+                variant="caption"
+                align="center"
+              >
+                <Chip label="Management"/>
+              </Typography>
+            </li>
             <List>
-            {['Employees'].map((text, index) => (
-              <ListItem button onClick={e => handleSidebarButton(text)} key={text} className={classes.drawerItem}>
-                <ListItemIcon className={classes.drawerItem}>{index == 0 ? <PeopleRoundedIcon /> : <InboxIcon />}</ListItemIcon>
-                <ListItemText primary={text} className={classes.drawerItem}/>
+              <ListItem button onClick={e => handleSidebarButton('Employees')} key={'Employees'} className={classes.drawerItem}>
+                  <ListItemIcon className={classes.drawerItem}><PeopleRoundedIcon /></ListItemIcon>
+                  <ListItemText primary={'Employees'} className={classes.drawerItem}/>
               </ListItem>
-            ))}
-          </List>
+              {isManagementReq && (
+                <ListItem button onClick={e => handleSidebarButton('Approvals')} key={'Approvals'} className={classes.drawerItem}>
+                  <ListItemIcon className={classes.drawerItem}><InboxIcon /></ListItemIcon>
+                  <ListItemText primary={'Requests'} className={classes.drawerItem}/>
+                </ListItem>
+              )}
+            </List>
+            </div>
           )}
+
+          <Divider component={'li'} className={classes.drawerDivider}/>
+            <li>
+              <Typography
+                color="primary"
+                display="block"
+                variant="caption"
+                align="center"
+              >
+                <Chip label="Services"/>
+              </Typography>
+            </li>
+
+          <List>
+            <ListItem button onClick={e => handleSidebarButton('ESS')} key={'ESS'} className={classes.drawerItem}>
+              <ListItemIcon className={classes.drawerItem}><AppsIcon /></ListItemIcon>
+              <ListItemText primary={'Employee Services'} className={classes.drawerItem}/>
+            </ListItem>
+          </List>
 
         </div>
       </Drawer>

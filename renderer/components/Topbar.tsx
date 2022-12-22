@@ -23,11 +23,15 @@ import Avatar from '@material-ui/core/Avatar';
 import MoreIcon from '@material-ui/icons/MoreVert';
 import clsx from 'clsx';
 import secureLocalStorage from 'nextjs-secure-local-storage';
-import { IAuth } from '../pages/next';
 import { Notification } from '../utils/notification_manager';
 import TimeAgo from 'javascript-time-ago';
 import en from 'javascript-time-ago/locale/en'
-import { Timestamp } from 'firebase/firestore';
+import { collection, doc, onSnapshot, Timestamp } from 'firebase/firestore';
+import { database } from '../database/firebase';
+import { IAuth } from '../utils/auth_manager';
+import SearchBar from 'material-ui-search-bar';
+import Router from 'next/router';
+import { SidebarNav } from '../utils/sidebar_nav_manager';
 
 TimeAgo.addDefaultLocale(en);
 
@@ -70,15 +74,6 @@ const useStyles = makeStyles((theme: Theme) =>
         width: 'auto',
       },
     },
-    searchIcon: {
-      padding: theme.spacing(0, 2),
-      height: '100%',
-      position: 'absolute',
-      pointerEvents: 'none',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
     inputRoot: {
       color: 'inherit',
     },
@@ -119,12 +114,18 @@ const useStyles = makeStyles((theme: Theme) =>
         duration: theme.transitions.duration.enteringScreen,
       }),
     },
+    searchBar: {
+      width: '100%',
+      backgroundColor: '#f7e686',
+    }
   }),
 );
 
 export interface TopbarProps {
   handleOpenDrawer: () => void;
   handleLogOut: () => void;
+  handleSearch: (searched: string) => void;
+  handleSearchClick: () => void;
 }
 
 export default function Topbar(props: TopbarProps) {
@@ -135,9 +136,17 @@ export default function Topbar(props: TopbarProps) {
   const [notifCount, setNotifCount]  = React.useState(0);
   const [unreadNotifCount, setUnreadNotifCount]  = React.useState(0);
   const [notifs, setNotifs] = React.useState<Notification[]>([]);
-  const { handleOpenDrawer, handleLogOut } = props;
+  const { handleOpenDrawer, handleLogOut, handleSearch, handleSearchClick } = props;
   const [open, setOpen] = React.useState(true);
   var auth = secureLocalStorage.getItem('auth') as IAuth;
+  const db_notifcounts = collection(database, 'notifcounts');
+  var unsub;
+
+  React.useEffect(() => {
+    unsub = onSnapshot(doc(db_notifcounts, auth.eid), (doc) => {
+      getAllNotifications();
+    });
+  }, []);
 
   const handleNotifOpen = (event: React.MouseEvent<HTMLElement>) => {
     setNotifAnchorEl(event.currentTarget);
@@ -148,10 +157,12 @@ export default function Topbar(props: TopbarProps) {
   };
 
   const showAllNotifications = (event: React.MouseEvent<HTMLElement>) => {
+    var unreads = unreadNotifCount;
     notifs.forEach(e => {
       if(e.isRead === false){
         e.isRead = true;
-        setUnreadNotifCount(unreadNotifCount-1);
+        unreads--;
+        setUnreadNotifCount(unreads);
         Notification.readNotification(e.id);
       }
       
@@ -161,14 +172,19 @@ export default function Topbar(props: TopbarProps) {
 
   const getAllNotifications = () => {
     Notification.getNotifications(auth.eid).then((notifs) => {
+      var unreads = 0;
+      var allnotifs = 0;
       setNotifs(notifs.docs.map((item) => {
         if(item.data().isRead === false){
-          setUnreadNotifCount(unreadNotifCount+1);
+          unreads++;
+          setUnreadNotifCount(unreads);
+          console.log('Unread notifs: ' + unreadNotifCount);
         }
-        setNotifCount(notifCount+1);
-        return {id: item.id, eid: item.data().eid, title: item.data().title, message: item.data().message, time: item.data().time, isRead: item.data().isRead};
+        allnotifs++;
+        setNotifCount(allnotifs);
+        return {id: item.id, eid: item.data().eid, title: item.data().title, message: item.data().message, time: item.data().time, isRead: item.data().isRead, key: item.id};
       }));
-    })
+    });
   }
 
   React.useEffect(() => {
@@ -326,6 +342,17 @@ export default function Topbar(props: TopbarProps) {
     </Menu>
   );
 
+  const [searched, setSearched] = React.useState<string>("");
+  
+  const requestSearch = (searchedVal: string) => {
+    handleSearch(searchedVal);
+  };
+
+  const cancelSearch = () => {
+    setSearched("");
+    requestSearch(searched);
+  };
+
   return (
     <div className={classes.grow}>
       <AppBar position="static"
@@ -347,19 +374,33 @@ export default function Topbar(props: TopbarProps) {
           <Typography className={classes.title} variant="h6" noWrap>
             Stuck in The Movie
           </Typography>
-          <div className={classes.search}>
-            <div className={classes.searchIcon}>
-              <SearchIcon />
-            </div>
-            <InputBase
-              placeholder="Search…"
-              classes={{
-                root: classes.inputRoot,
-                input: classes.inputInput,
-              }}
-              inputProps={{ 'aria-label': 'search' }}
-            />
+          {SidebarNav.currentPathname === '/searchlist' && 
+            <div className={classes.search}>
+              <SearchBar
+                value={searched}
+                onChange={(searchVal) => requestSearch(searchVal)}
+                onCancelSearch={() => cancelSearch()}
+                cancelOnEscape
+                className={classes.searchBar}
+                placeholder="Search anything.."
+                autoFocus
+              />
           </div>
+        }
+        {SidebarNav.currentPathname !== '/searchlist' &&
+        <div className={classes.search}  onClick={handleSearchClick}> 
+          <SearchBar
+            value={searched}
+            onChange={(searchVal) => requestSearch(searchVal)}
+            onCancelSearch={() => cancelSearch()}
+            cancelOnEscape
+            disabled
+            className={classes.searchBar}
+            placeholder="Search anything.."
+          />
+        </div>
+      }
+
           <div className={classes.grow} />
           <div className={classes.sectionDesktop}>
             <IconButton aria-label="show-new-mails" color="inherit">

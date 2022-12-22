@@ -22,6 +22,14 @@ import Router from 'next/router';
 import secureLocalStorage from 'nextjs-secure-local-storage';
 import { populateOtherEmployees } from '../database/seeders';
 import { PatternFormat } from 'react-number-format';
+import DeptDivsManager from '../utils/deptsdivs_manager';
+import { SidebarNav } from '../utils/sidebar_nav_manager';
+import { Attendance } from '../utils/attendance_manager';
+import { WorkingTime } from '../utils/workingtime_manager';
+import { AgeRating } from '../utils/agerating_manager';
+import { Genre } from '../utils/genre_manager';
+import { Producer } from '../utils/producers_manager';
+import { Movie } from '../utils/movies_manager';
 
 const db_departments = collection(database, 'departments');
 const db_divisions = collection(database, 'divisions');
@@ -62,24 +70,25 @@ export interface LoginFormProps {
 }
 
 function DepartmentDialog(props: SelectDeptProps) {
-  const [ departmentsArray, setDepartmentsArray ] = React.useState([]);
+  // const [ departmentsArray, setDepartmentsArray ] = React.useState([]);
   const { onClose, selectedDeptName, selectedDeptNo, open } = props;
 
   const classes = useStyles({});
 
-  const getDepts = () => {
-    getDocs(db_departments)
-        .then((data) => {
-          setDepartmentsArray(data.docs.map((item) => {
-            console.log(item);
-            return { ...item.data(), id: item.id };
-        }));
-        });
-  }
+  // const getDepts = () => {
+  //   getDocs(db_departments)
+  //       .then((data) => {
+  //         setDepartmentsArray(data.docs.map((item) => {
+  //           console.log(item);
+  //           return { ...item.data(), id: item.id };
+  //       }));
+  //       });
+  // }
 
   React.useEffect(() => {
-    getDepts();
-    console.log('RETRIEVED DEPARTMENTS FROM FIREBASE!');
+    // getDepts();
+    DeptDivsManager.getInstance();
+    console.log('Retrieved instance of DDM!');
   }, []);
 
   const handleClose = () => {
@@ -94,7 +103,7 @@ function DepartmentDialog(props: SelectDeptProps) {
         <Dialog onClose={handleClose} aria-labelledby="simple-dialog-title" open={open}>
           <DialogTitle id="simple-dialog-title">Select department</DialogTitle>
           <List>
-            {departmentsArray.map((dept) => (
+            {DeptDivsManager.getInstance().getAllDepartments().map((dept) => (
               <ListItem button onClick={() => handleListItemClick(dept.name, dept.number)} key={dept.number}>
                 <ListItemAvatar>
                   <Avatar className={classes.avatar}>
@@ -122,7 +131,12 @@ function LoginForm(props: LoginFormProps){
   const {open, handleClose, handleClickOpen, handleSubmit, deptNo } = props;
   const [divNo, setDivNo] = React.useState<string | number>('NODIVISION');
   const [openDiv, setOpenDiv] = React.useState(false);
-  const [ divisionsArray , setDivisionsArray ] = React.useState([]);
+  // const [ divisionsArray , setDivisionsArray ] = React.useState([]);
+
+  const handleLocalClose = () => {
+    setDivNo('NODIVISION');
+    handleClose();
+  }
 
   const [ eid, setEid ] = React.useState<string>('');
   const [ pwd, setPwd ] = React.useState<string>('');
@@ -130,24 +144,16 @@ function LoginForm(props: LoginFormProps){
   const classes = useStyles({});
 
   var q : Query<DocumentData>;
-  React.useEffect(() => {
-    queried = true;
-    q = query(db_divisions, where("department_no", "==", deptNo));
-    console.log('Performing query on divisions with dept no ' + deptNo);
-    getDivs();
-    console.log('RETRIEVED DEPARTMENTS FROM FIREBASE!');
-    setDivNo('NODIVISION');
-  }, [queried]);
 
-  const getDivs = () => {
-    getDocs(q)
-        .then((data) => {
-          setDivisionsArray(data.docs.map((item) => {
-            console.log('Query Result : ' + item);
-            return { ...item.data(), id: item.id};
-        }));
-        });
-  }
+  // const getDivs = () => {
+  //   getDocs(q)
+  //       .then((data) => {
+  //         setDivisionsArray(data.docs.map((item) => {
+  //           console.log('Query Result : ' + item);
+  //           return { ...item.data(), id: item.id};
+  //       }));
+  //       });
+  // }
 
   const handleChange = (event: React.ChangeEvent<{ value: number }>) => {
     setDivNo(event.target.value as number);
@@ -173,13 +179,13 @@ function LoginForm(props: LoginFormProps){
   };
 
     return(
-      <Dialog open={open} onClose={handleClose} aria-labelledby="form-dialog-title">
+      <Dialog open={open} onClose={handleLocalClose} aria-labelledby="form-dialog-title">
             <DialogTitle id="form-dialog-title">Authentication</DialogTitle>
             <DialogContent>
               <DialogContentText>
                 Please authenticate yourself before accessing the Stuck In The Movie system.
               </DialogContentText>
-              {divisionsArray.length > 0 && (
+              {DeptDivsManager.getInstance().getDivisions(deptNo).length > 0 && (
                 <FormControl>
                 <InputLabel id="demo-controlled-open-select-label">Select your division</InputLabel>
                 <Select
@@ -194,7 +200,7 @@ function LoginForm(props: LoginFormProps){
                  <MenuItem value="NODIVISION">
                    <em>Select a division</em>
                  </MenuItem>
-                 {divisionsArray.map((div) => (
+                 {DeptDivsManager.getInstance().getDivisions(deptNo).map((div) => (
                    <MenuItem value={div.division_no} key={div.id}>{div.name}</MenuItem>
                  ))}
                 </Select>
@@ -221,7 +227,7 @@ function LoginForm(props: LoginFormProps){
               />
             </DialogContent>
             <DialogActions>
-              <Button variant="contained" onClick={handleClose} color="secondary">
+              <Button variant="contained" onClick={handleLocalClose} color="secondary">
                 Cancel
               </Button>
               <Button type="submit" variant="contained" onClick={e => handleSubmit(eid,pwd)} color="primary">
@@ -251,7 +257,25 @@ function Home() {
     // populateDepartments();
     // populateDivisions();
     // populateOtherEmployees();
+    // Attendance.seedAttendances().then(() => {
+    //   console.log("Attendance seeding complete!");
+    // })
     // seeded = true;
+    // WorkingTime.seedWorkingTimes().then(() => {
+    //   console.log("Working time seeding complete!");
+    // })
+    // AgeRating.seedAgeRatings().then(() => {
+    //   console.log("Age rating seeding complete!");
+    // })
+    // Genre.seedGenres().then(() => {
+    //   console.log("Genre seeding complete!");
+    // })
+    // Producer.seedProducers().then(() => {
+    //   console.log("Movie producer seeding complete!");
+    // })
+    // Movie.seedMovies().then(() => {
+    //   console.log("Movie seeding complete!");
+    // })
   }, []);
   // Comment after use
   
@@ -279,6 +303,7 @@ function Home() {
           secureLocalStorage.setItem('auth', {...data.docs[0].data(), id: data.docs[0].id});
           setAuthed(secureLocalStorage.getItem('auth') != null && Object.keys(secureLocalStorage.getItem('auth')).length > 0);
           Router.push('/next');
+          SidebarNav.currentPathname = '/next';
         }else{
           setOpenSnackbar(true);
         }

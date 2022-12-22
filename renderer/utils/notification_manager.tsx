@@ -1,7 +1,8 @@
-import { addDoc, collection, doc, getDocs, orderBy, query, Timestamp, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, doc, FieldValue, Firestore, getDoc, getDocs, increment, onSnapshot, orderBy, query, setDoc, Timestamp, updateDoc, where } from 'firebase/firestore';
 import { database } from '../database/firebase';
 
 const db_notifications = collection(database, 'notifications');
+const db_notifcounts = collection(database, 'notifcounts');
 
 export class Notification {
     id: string;
@@ -19,10 +20,15 @@ export class Notification {
             time: Timestamp.now(),
             isRead: false
         });
+
+        const countRef = doc(db_notifcounts, eid);
+        updateDoc(countRef, {count: increment(1)}).catch((error => {
+            setDoc(countRef, {count: increment(1)});
+        }));
     }
 
     static async getNotifications (eid: string){
-        const q = query(db_notifications, where('eid', '==', eid), orderBy('time'));
+        const q = query(db_notifications, where('eid', '==', eid), orderBy('time', 'desc'));
         const promise = await getDocs(q);
 
         return promise;

@@ -20,12 +20,16 @@ import Switch from '@material-ui/core/Switch';
 import HighlightOffIcon from '@material-ui/icons/HighlightOff';
 import AssignmentLateRoundedIcon from '@material-ui/icons/AssignmentLateRounded';
 import FilterListIcon from '@material-ui/icons/FilterList';
+import ScheduleIcon from '@material-ui/icons/Schedule';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { database } from '../database/firebase';
 import { Alert, Skeleton } from '@material-ui/lab';
 import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, FormControl, Grid, InputLabel, MenuItem, Select, Snackbar } from '@material-ui/core';
 import SearchBar from 'material-ui-search-bar';
-import { issueWarningLetter } from '../utils/warningletter_manager';
+import { getApprovedWarningLetterCount, issueWarningLetter } from '../utils/warningletter_manager';
+import EmptyDialog from './EmptyDialog';
+import WorkingTimeAccordion from './WorkingTimes';
+import { EmployeeUtils } from '../utils/employee_manager';
 
 const db_employees = collection(database, 'employees');
 const db_departments = collection(database, 'departments');
@@ -184,16 +188,24 @@ interface EnhancedTableToolbarProps {
   numSelected: number;
   selected: string;
   searchBar: any;
+  giveWarnLetter: boolean;
+  changeWorkTime: boolean;
+  
   handleIssueLetterOpen: (eid: string) => void;
+  handleWorkingTime: (eid: string) => void;
   handleClearSelection: () => void;
 }
 
 const EnhancedTableToolbar = (props: EnhancedTableToolbarProps) => {
   const classes = useToolbarStyles();
-  const { numSelected, selected, searchBar, handleIssueLetterOpen, handleClearSelection } = props;
+  const { numSelected, selected, searchBar, handleIssueLetterOpen, handleWorkingTime, handleClearSelection, giveWarnLetter, changeWorkTime } = props;
 
   const handleIssueLetterClick = () => {
     handleIssueLetterOpen(selected)
+  }
+
+  const handleWorkingTimeClick = () => {
+    handleWorkingTime(selected)
   }
 
   return (
@@ -213,7 +225,16 @@ const EnhancedTableToolbar = (props: EnhancedTableToolbarProps) => {
           No selected employees
         </Typography>
       )}
-      {numSelected == 1 && (
+      {numSelected == 1 && changeWorkTime && (
+        <div>
+        <Tooltip title="View Working Time">
+          <IconButton aria-label="working-time" style={{color: 'white'}} onClick={handleWorkingTimeClick}>
+            <ScheduleIcon />
+          </IconButton>
+        </Tooltip>
+        </div>
+      )}
+      {numSelected == 1 && giveWarnLetter && (
         <div>
         <Tooltip title="Issue Warning Letter">
           <IconButton aria-label="warning-letter" style={{color: 'white'}} onClick={handleIssueLetterClick}>
@@ -308,7 +329,7 @@ function getDivName(divId: string | number) : string{
   return ret;
 }
 
-export default function ManageTable({access}: {access: boolean}) {
+export default function ManageTable({access, giveWarnLetter, changeWorkTime}: {access: boolean, giveWarnLetter: boolean, changeWorkTime: boolean}) {
 
   const classes = useStyles();
   const [order, setOrder] = React.useState<Order>('asc');
@@ -323,6 +344,7 @@ export default function ManageTable({access}: {access: boolean}) {
   const [originalRows, setOriginalRows] = React.useState<Data[]>([]);
   const [internalRows, setInternalRows] = React.useState<Data[]>([]);
   const [openIssueLetter, setOpenIssueLetter] = React.useState(false);
+  const [openDetailDialog, setOpenDetailDialog] = React.useState(false);
   const [openSnackbar, setOpenSnackbar] = React.useState(false);
 
   const [openDiv, setOpenDiv] = React.useState(false);
@@ -330,6 +352,9 @@ export default function ManageTable({access}: {access: boolean}) {
 
   const [selEmployee, setSelEmployee] = React.useState<Data>();
   const [selEmpLettersCount, setSelEmpLettersCount] = React.useState(0);
+  const [selEmpLettersFetched, setSelEmpLettersFetched] = React.useState(false);
+
+  const [openIssueLetterAlert, setOpenIssueLetterAlert] = React.useState(false);
 
   const handleChangeReason = (event: React.ChangeEvent<{ value: string }>) => {
     setWarningReason(event.target.value as string);
@@ -344,6 +369,7 @@ export default function ManageTable({access}: {access: boolean}) {
   }
 
   const handleIssueLetterOpen = (eid: string) => {
+    setSelEmpLettersFetched(false);
     setOpenIssueLetter(true);
     const q = query(db_employees, where('eid', '==', eid));
 
@@ -360,17 +386,37 @@ export default function ManageTable({access}: {access: boolean}) {
             ephone: data.docs[0].data().phone,
             esalary: data.docs[0].data().salary,
           });
-          getDocs(wl).then((wldata) => {
-            setSelEmpLettersCount(wldata.size);
-
+          getApprovedWarningLetterCount(eid).then((count) => {
+            setSelEmpLettersCount(count);
+            setSelEmpLettersFetched(true);
           });
         });
   }
 
+  const handleWorkingTime = (eid: string) => {
+    setOpenDetailDialog(true);
+    EmployeeUtils.getEmployee(eid).then((data) => {
+      setSelEmployee({
+        eid: data.docs[0].data().eid,
+        ename: data.docs[0].data().name,
+        edept: data.docs[0].data().dept_id,
+        ediv: data.docs[0].data().div_id,
+        eemail: data.docs[0].data().email,
+        ephone: data.docs[0].data().phone,
+        esalary: data.docs[0].data().salary,
+      });
+    })
+  }
+
   const handleIssueLetterConfirm = (eid: string, reason: string) => {
-    setOpenIssueLetter(false);
-    setOpenSnackbar(true);
-    issueWarningLetter(eid, reason);
+    if(reason !== "UNDEFINEDREASON"){
+      issueWarningLetter(eid, reason);
+      setOpenSnackbar(true);
+      setOpenIssueLetter(false);
+    }else{
+      setOpenIssueLetterAlert(true);
+    }
+    
   }
 
   const getAllEmployees = (setFetched: any) => {
@@ -413,7 +459,7 @@ export default function ManageTable({access}: {access: boolean}) {
     setTimeout(() => {
       setLoading(false);
       setFetched(true);
-    }, 4000);
+    }, 2500);
   }, []);
 
   if(fetched){
@@ -491,7 +537,7 @@ export default function ManageTable({access}: {access: boolean}) {
     return (
     <div className={classes.root}>
       <Paper className={classes.paper} style={{backgroundColor: '#000'}}>
-      <EnhancedTableToolbar selected={selected[0]} handleIssueLetterOpen={handleIssueLetterOpen} handleClearSelection={handleClearSelection} searchBar={
+      <EnhancedTableToolbar handleWorkingTime={handleWorkingTime} changeWorkTime={changeWorkTime} selected={selected[0]} giveWarnLetter={giveWarnLetter} handleIssueLetterOpen={handleIssueLetterOpen} handleClearSelection={handleClearSelection} searchBar={
         (<SearchBar
           value={searched}
           onChange={(searchVal) => requestSearch(searchVal)}
@@ -525,7 +571,7 @@ export default function ManageTable({access}: {access: boolean}) {
     return (
       <div className={classes.root}>
         <Paper className={classes.paper}>
-          <EnhancedTableToolbar selected={selected[0]} handleIssueLetterOpen={handleIssueLetterOpen} handleClearSelection={handleClearSelection} searchBar={
+          <EnhancedTableToolbar handleWorkingTime={handleWorkingTime} changeWorkTime={changeWorkTime}  selected={selected[0]} giveWarnLetter={giveWarnLetter} handleIssueLetterOpen={handleIssueLetterOpen} handleClearSelection={handleClearSelection} searchBar={
         (<SearchBar
           value={searched}
           onChange={(searchVal) => requestSearch(searchVal)}
@@ -613,6 +659,9 @@ export default function ManageTable({access}: {access: boolean}) {
           label="Dense padding"
         />
         <Dialog open={openIssueLetter} onClose={handleIssueLetterClose}>
+        {openIssueLetterAlert && (
+          <Alert severity="error" onClose={() => setOpenIssueLetterAlert(false)}>Issuance reason must be selected!</Alert>
+        )}
         <DialogTitle>Issue Warning Letter</DialogTitle>
         <DialogContent dividers>
           <DialogContentText>
@@ -622,7 +671,7 @@ export default function ManageTable({access}: {access: boolean}) {
             Department&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: <b>{getDeptName(selEmployee ? selEmployee.edept : "")}</b><br/>
             Division&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: <b>{getDivName(selEmployee ? selEmployee.ediv : "")}</b><br/><br/>
 
-            which currently has <b>{selEmpLettersCount ? selEmpLettersCount : 0}</b> active warning letters.<br/>
+            which currently has <b>{selEmpLettersFetched ? selEmpLettersCount : "loading.."}</b> active warning letters.<br/>
           </DialogContentText>
         </DialogContent>
         <DialogContent>
@@ -649,7 +698,7 @@ export default function ManageTable({access}: {access: boolean}) {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleIssueLetterClose}>Cancel</Button>
-          <Button color='primary' variant='contained' onClick={e => handleIssueLetterConfirm(selEmployee.eid, warningReason)}>Issue Letter</Button>
+          {selEmpLettersFetched && (<Button color='primary' variant='contained' onClick={e => handleIssueLetterConfirm(selEmployee.eid, warningReason)}>Issue Letter</Button>)}
         </DialogActions>
         </Dialog>
         <Snackbar open={openSnackbar} autoHideDuration={4000} onClose={handleSnackbarClose}>
@@ -657,6 +706,9 @@ export default function ManageTable({access}: {access: boolean}) {
             Warning letter has been successfully issued!
           </Alert>
         </Snackbar>
+        <EmptyDialog title={(selEmployee ? selEmployee.ename : "loading..") + '\'s working time'} openDialog={openDetailDialog} setOpenDialog={setOpenDetailDialog} onDialogFinish={() => {}} content={
+          <WorkingTimeAccordion eid={selEmployee ? selEmployee.eid : "000"} manage={true}/>
+        }/>
       </div>
     );
   }

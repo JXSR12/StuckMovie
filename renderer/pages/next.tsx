@@ -1,21 +1,16 @@
 import React from 'react';
 import Head from 'next/head';
 import { Theme, makeStyles, createStyles } from '@material-ui/core/styles';
-import Button from '@material-ui/core/Button';
 import Typography from '@material-ui/core/Typography';
-import Link from '../components/Link';
 import Router from 'next/router';
-import secureLocalStorage from 'nextjs-secure-local-storage';
 import ManageTable from '../components/ManageTable';
-import { collection, DocumentData, getDocs, QueryDocumentSnapshot, QuerySnapshot, Timestamp } from 'firebase/firestore';
-import { database } from '../database/firebase';
 import PeopleRoundedIcon from '@material-ui/icons/PeopleRounded'
-import Topbar from '../components/Topbar';
 import Sidebar from '../components/Sidebar';
 import clsx from 'clsx';
 import { Box } from '@material-ui/core';
-
-const db_employees = collection(database, 'employees');
+import { getAuthUser, IAuth, logOut } from '../utils/auth_manager';
+import { SidebarNav } from '../utils/sidebar_nav_manager';
+import { AppManager } from '../utils/apps_manager';
 
 const drawerWidth = 240;
 
@@ -50,80 +45,61 @@ const useStyles = makeStyles((theme: Theme) =>
   })
 );
 
-
-async function checkAuth() {
-  return secureLocalStorage.getItem('auth') != null && Object.keys(secureLocalStorage.getItem('auth')).length > 0;
-}
-
-const logOut = (setAuthed: any) => {
-  secureLocalStorage.removeItem('auth');
-  checkAuth().then((res) => {
-    setAuthed(res);
-    console.log('After log out ' + secureLocalStorage.getItem('auth'));
-  })
-}
-
-export interface IAuth {
-  address?: string;
-  dept_id?: string;
-  div_id?: string;
-  dob?: Timestamp;
-  eid?: string;
-  email?: string;
-  name?: string;
-  password?: string;
-  phone?: string;
-  salary?: number;
-}
-
 function Next() {
   const classes = useStyles({});
-  const [ authed, setAuthed ] = React.useState(true);
   const [ manage, setManage ] = React.useState(false);
-  const [ auth, setAuth ] = React.useState<IAuth>(secureLocalStorage.getItem('auth') as IAuth);
+  const [ managReq, setManageReq ]  = React.useState(false);
+  const [ warnletter, setWarnletter ] = React.useState(false);
+  const [ changeWorkTime, setChangeWorkTime ] = React.useState(false);
+  const [ auth, setAuth ] = React.useState<IAuth>(getAuthUser());
   const [ open, setOpen ] = React.useState(true);
 
   React.useEffect(() => {
-    checkAuth().then((res) => {
-      setAuthed(res);
-      setAuth(secureLocalStorage.getItem('auth') as IAuth);
-      if(auth && auth.dept_id === 'qIvZZoS7Bnro7bD7DpWs'){
-        setManage(true);
-      }
+    if(auth && (auth.dept_id === 'qIvZZoS7Bnro7bD7DpWs' || auth.dept_id === '44dnLCF6Mksm8k2jn09w')){
+      setManage(true);
+    }
 
-      console.log('Authed: ' + authed + '| object: ' + secureLocalStorage.getItem('auth'));
-      console.log(secureLocalStorage.getItem('auth'));
+    if(auth && (auth.dept_id === 'qIvZZoS7Bnro7bD7DpWs')){
+      setManageReq(true);
+    }
 
-      if(!authed){
-        Router.push('/home');
-      }
-    });
-  }, [authed]);
+    if(auth.dept_id === '44dnLCF6Mksm8k2jn09w'){
+      setWarnletter(true);
+      setChangeWorkTime(true);
+    }
+
+    console.log('Authed: ' + auth + '| object: ' + auth);
+
+    if(!auth){
+      Router.push('/home');
+      SidebarNav.currentPathname = '/home';
+    }
+  }, [auth]);
 
   const handleOpenDrawer = () => {
     setOpen(!open);
   }
 
   const handleLogOut = () => {
-    logOut(setAuthed);
+    logOut(setAuth);
   }
 
-  const handleSidebarButton = (key: string) => {
-    if(key === 'Employees'){
-      if(Router.pathname !== '/next'){
-        Router.push('/next');
-      }
-    }
+  const handleSidebarButton = SidebarNav.handleSidebarButton;
+
+  const handleSearchClick = AppManager.handleDefaultSearchClick;
+
+  const handleSearch = () => {
+
   }
 
   return (
     <React.Fragment>
-      <Sidebar isManagement={manage} handleSidebarButton={handleSidebarButton} handleLogOut={handleLogOut} handleOpenDrawerParent={handleOpenDrawer}/>
+      <Sidebar isManagement={manage} handleSearch={handleSearch} handleSearchClick={handleSearchClick} isManagementReq={managReq} handleSidebarButton={handleSidebarButton} handleLogOut={handleLogOut} handleOpenDrawerParent={handleOpenDrawer}/>
       <div className={clsx(classes.content, {
         [classes.contentShift]: open,
       })}>
         <Head>
-          <title>Dashboard - Stuck in The Movie Cinema System</title>
+          <title>Employees - Stuck in The Movie Cinema System</title>
         </Head>
         <div className={classes.root}>
           <Box p="3rem">
@@ -133,7 +109,7 @@ function Next() {
               
             </Typography>
           </Box>
-          {manage && (<ManageTable access={manage}></ManageTable>)}
+          {manage && (<ManageTable changeWorkTime={changeWorkTime} access={manage} giveWarnLetter={warnletter}></ManageTable>)}
         </div>
       </div>
     </React.Fragment>
