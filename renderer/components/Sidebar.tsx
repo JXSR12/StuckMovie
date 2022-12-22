@@ -106,7 +106,7 @@ export default function Sidebar(props: SidebarProps) {
               </Typography>
             </li>
           <List>
-            <ListItem button key={'Movies'} className={classes.drawerItem}>
+            <ListItem button onClick={e => handleSidebarButton('Movies')} key={'Movies'} className={classes.drawerItem}>
                 <ListItemIcon className={classes.drawerItem}><LocalMoviesIcon/></ListItemIcon>
                 <ListItemText primary={'Movies'} className={classes.drawerItem}/>
             </ListItem>
