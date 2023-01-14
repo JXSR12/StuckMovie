@@ -95,6 +95,19 @@ export class Movie {
     }
 }
 
+export async function insertNewMovie(
+    title: string,
+    synopsis: string,
+    durationMinutes: number,
+    genres: Genre[],
+    ageRating: AgeRating,
+    producer: Producer,
+    poster_url: string
+    ){
+    const mv : Movie = new Movie("", title, synopsis, durationMinutes, genres, ageRating, producer, poster_url);
+    mv.insert();
+}
+
 export async function getMovie(id: string) {
     const docRef = doc(database, 'movies', id);
     const promise = await getDoc(docRef);

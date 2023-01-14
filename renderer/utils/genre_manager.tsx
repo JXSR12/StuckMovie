@@ -24,7 +24,6 @@ export class Genre {
             "Action",
             "Drama",
             "Horror",
-            "Thriller",
             "Adventure",
             "Romance",
             "Thriller",

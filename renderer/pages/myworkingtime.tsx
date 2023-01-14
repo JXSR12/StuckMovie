@@ -112,7 +112,7 @@ function MyWorkingTime() {
             </Typography>
           </Box>
         <div className={classes.root}>
-            <WorkingTimeAccordion eid={getAuthUser().eid} manage={false} />
+          {auth && (<WorkingTimeAccordion eid={getAuthUser().eid} manage={false} />)}
         </div>
       </div>
     </React.Fragment>

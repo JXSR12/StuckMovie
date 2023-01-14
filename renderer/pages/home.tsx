@@ -30,6 +30,11 @@ import { AgeRating } from '../utils/agerating_manager';
 import { Genre } from '../utils/genre_manager';
 import { Producer } from '../utils/producers_manager';
 import { Movie } from '../utils/movies_manager';
+import { Branch } from '../utils/branch_manager';
+import { TheatreLayout } from '../utils/theatrelayouts_manager';
+import { Theatre } from '../utils/theatres_manager';
+import { Member } from '../utils/members_manager';
+import { FNBMenu } from '../utils/fnbmenu_manager';
 
 const db_departments = collection(database, 'departments');
 const db_divisions = collection(database, 'divisions');
@@ -276,6 +281,21 @@ function Home() {
     // Movie.seedMovies().then(() => {
     //   console.log("Movie seeding complete!");
     // })
+    // Branch.seedBranches().then(() => {
+    //   console.log("Branch seeding complete!")
+    // });
+    // TheatreLayout.seedTheatreLayouts().then(() => {
+    //   console.log("Theatre Layouts seeding complete!")
+    // });
+    // Theatre.seedTheatres().then(() => {
+    //   console.log("Theatre seeding complete!")
+    // });
+    // Member.seedMembers().then(() => {
+    //   console.log("Members seeding complete!");
+    // });
+    // FNBMenu.seedFoodBeverages().then(() => {
+    //     console.log("FNB Seeding seeding complete!");
+    //   });
   }, []);
   // Comment after use
   
@@ -302,8 +322,8 @@ function Home() {
         if(res == true){
           secureLocalStorage.setItem('auth', {...data.docs[0].data(), id: data.docs[0].id});
           setAuthed(secureLocalStorage.getItem('auth') != null && Object.keys(secureLocalStorage.getItem('auth')).length > 0);
-          Router.push('/next');
-          SidebarNav.currentPathname = '/next';
+          Router.push('/myattendance');
+          SidebarNav.currentPathname = '/myattendance';
         }else{
           setOpenSnackbar(true);
         }

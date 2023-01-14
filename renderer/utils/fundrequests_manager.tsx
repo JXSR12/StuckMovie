@@ -21,16 +21,25 @@ import { Request } from './requests_manager';
 import Grid from '@material-ui/core/Grid';
 import ExitToApp from '@material-ui/icons/ExitToApp';
 
-const db_leaverequests = collection(database, 'leaverequests');
+const db_fundrequests = collection(database, 'fundrequests');
 
-export class LeaveRequest extends Request{
-    leave_date: Timestamp
-    leave_duration: number
+export enum FundRequestFundType{
+    Cash,
+    Card,
+    BankTransfer,
+    Reimbursement
+}
+
+export class FundRequest extends Request{
+    amount: number
+    fund_type: FundRequestFundType
+    dept_id: string
     constructor(
         eid: string,
         reason: string,
-        leave_date: Timestamp,
-        leave_duration: number,
+        amount: number,
+        fund_type: FundRequestFundType,
+        dept_id: string,
         issued_date: Timestamp,
         issuer_eid: string,
         status: RequestStatus,
@@ -38,16 +47,18 @@ export class LeaveRequest extends Request{
         finalizer_eid : string
     ) {
         super(eid, reason, issued_date, issuer_eid, status, finalized_date, finalizer_eid);
-        this.leave_date = leave_date;
-        this.leave_duration = leave_duration;
+        this.amount = parseInt(amount);
+        this.fund_type = fund_type;
+        this.dept_id = dept_id;
     }
 
     insert() {
-        const q = addDoc(db_leaverequests, {
+        const q = addDoc(db_fundrequests, {
             eid: this.eid,
             reason: this.reason,
-            leave_date: this.leave_date,
-            leave_duration: this.leave_duration,
+            amount: this.amount,
+            fund_type: this.fund_type,
+            dept_id: this.dept_id,
             issued_date: this.issued_date,
             issuer_eid: this.issuer_eid,
             status: this.status,
@@ -58,7 +69,7 @@ export class LeaveRequest extends Request{
     }
 }
 
-export function LRRequestListItem(props: {request: LeaveRequest, handleOpen: any}) {
+export function FNRequestListItem(props: {request: FundRequest, handleOpen: any}) {
     const [employee, setEmployee] = React.useState<IAuth>(null);
 
     const {request, handleOpen} = props;
@@ -71,7 +82,7 @@ export function LRRequestListItem(props: {request: LeaveRequest, handleOpen: any
 
     React.useEffect(() => {
         retrieveEntities();
-        console.log('[LRM] RETRIEVED ENTITIES FROM FIREBASE!');
+        console.log('[FUNDM] RETRIEVED ENTITIES FROM FIREBASE!');
       }, []);
 
     // return {id: letter.id, header: employee ? employee.name + ' (EID ' + letter.eid + ')' : 'retrieving data..', caption: letter.reason, status: letter.status, employee: employee} as RequestListItem;
@@ -82,15 +93,10 @@ export function LRRequestListItem(props: {request: LeaveRequest, handleOpen: any
             <ExitToApp />
           </Avatar>
         </ListItemAvatar>
-        <Grid direction='column'>
-            <ListItemText
-            primary={employee ? employee.name + ' (EID ' + request.eid + ')' : 'retrieving data..'}
-            secondary={"Reason: " + request.reason}
-            />
-            <ListItemText
-            secondary={"on " + request ? request.leave_date ? new Date(request.leave_date.seconds*1000).toLocaleString() : "loading.." : "loading.." + " for " + request.leave_duration + " hours"}
-            />
-        </Grid>
+        <ListItemText
+            primary={request ? DeptDivsManager.getInstance().getDeptName(request.dept_id) : "loading.."}
+            secondary={(request ? "IDR " + request.amount + " (" + FundRequestFundType[request.fund_type] + ")" : "loading..")}
+        />
         <ListItemSecondaryAction>
         <Tooltip title={request.status === RequestStatus.Approved ? 'Request Approved' : request.status === RequestStatus.Declined ? 'Request Declined' : 'Unfinalized Request'}>
           <IconButton edge="start" aria-label="view">
@@ -102,10 +108,11 @@ export function LRRequestListItem(props: {request: LeaveRequest, handleOpen: any
     );
 }
 
-export function LRInfocard(props: {request: LeaveRequest}) {
+export function FNInfocard(props: {request: FundRequest}) {
     const { request } = props;
 
     const [selEmpLRCount, setSelEmpLRCount] = React.useState(-1);
+    const [selDeptFundAmount, setSelDeptFundAmount] = React.useState<number>(0);
     const [employee, setEmployee] = React.useState<IAuth>(null);
     const [issuer, setIssuer] = React.useState<IAuth>(null);
     const [finalizer, setFinalizer] = React.useState<IAuth>(null);
@@ -117,6 +124,7 @@ export function LRInfocard(props: {request: LeaveRequest}) {
         EmployeeUtils.getEmployee(request.issuer_eid).then((emp) => {
             setIssuer(emp.docs[0].data() as IAuth);
         });
+        
         if(request.status !== RequestStatus.Pending){
             EmployeeUtils.getEmployee(request.finalizer_eid).then((emp) => {
                 setFinalizer(emp.docs[0].data() as IAuth);
@@ -126,10 +134,14 @@ export function LRInfocard(props: {request: LeaveRequest}) {
 
     React.useEffect(() => {
         retrieveEntities();
-        getApprovedLeaveRequestCount(request.eid).then((count) => {
+        getApprovedFundRequestCount(request.dept_id).then((count) => {
             setSelEmpLRCount(count);
         });
-        console.log('[LRM] RETRIEVED DEPARTMENTS, DIVISIONS, ENTITIES FROM FIREBASE!');
+        getAllocatedFunds(request.dept_id).then((sum) => {
+            setSelDeptFundAmount(sum);
+        });
+
+        console.log('[FUNDM] RETRIEVED DEPARTMENTS, DIVISIONS, ENTITIES FROM FIREBASE!');
       }, []);
 
         return(
@@ -137,34 +149,32 @@ export function LRInfocard(props: {request: LeaveRequest}) {
                 <CardActionArea>
                     <CardContent>
                         <Typography gutterBottom variant="h6" component="h2">
-                            {request.status !== RequestStatus.Pending ? "Employee Leave Request" : "Employee Leave Request"}
+                            {request.status !== RequestStatus.Pending ? "Department Fund Request" : "Department Fund Allocation"}
                         </Typography>
                         <Typography variant="body2" color="textSecondary" component="p">
-                            The following employee has requested to leave work on <b>{new Date(request.leave_date.seconds*1000).toLocaleString()}</b> for <b>{request.leave_duration} hours</b> :<br/><br/>
-    
-                            Employee Name : <b>{employee ? employee.name : "loading.."} (<i>EID: {request.eid}</i>)</b><br/>
-                            Department&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: <b>{employee ? DeptDivsManager.getInstance().getDeptName(employee.dept_id) : "loading.."}</b><br/>
-                            Division&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: <b>{employee ? DeptDivsManager.getInstance().getDivName(employee.div_id) : "loading.."}</b><br/><br/>
-    
-                            This employee has already left work <b>{selEmpLRCount !== -1 ? selEmpLRCount : "loading.."}</b> times before<br/><br/>
+                            Requesting Department: <b>{DeptDivsManager.getInstance().getDeptName(request.dept_id)}</b><br/>
+                            Requested Amount : IDR <b>{request.amount}</b><br/>
+                            Requested Fund Method: <b>{FundRequestFundType[request.fund_type]}</b><br/>
 
-                            This employee requested to leave work for the following reasons: &nbsp;
+                            This department has already received a total of IDR <b>{selDeptFundAmount}</b> in <b>{selEmpLRCount}</b> different fund allocations.<br/><br/>
+
+                            This fund request is going to be used for the following: &nbsp;
                             <b>{request.reason}</b>
     
                             <Box m={3}>
                                 <Divider light variant='fullWidth'/>
                             </Box>
     
-                            This leave request was made on <b>{new Date(request.issued_date.seconds*1000).toLocaleString()}</b>
+                            This fund request was issued on <b>{request && request.issued_date ? new Date(request.issued_date.seconds*1000).toLocaleString() : "loading.."}</b>
     
                             {request.status !== RequestStatus.Pending && (
-                            <div>
-                                <Box m={3}>
-                                    <Divider light variant='fullWidth'/>
-                                </Box>
-                                This leave request was {request.status === RequestStatus.Approved ? "approved" : "declined"} on <b>{new Date(request.finalized_date.seconds*1000).toLocaleString()}</b> by <b>{finalizer ? finalizer.name : "loading.."}</b> (<i>EID: {request.finalizer_eid}</i>)
-                                from <b>{finalizer ? DeptDivsManager.getInstance().getDeptName(finalizer.dept_id) : "loading.."}</b>
-                            </div>
+                                <div>
+                                    <Box m={3}>
+                                        <Divider light variant='fullWidth'/>
+                                    </Box>
+                                    This fund request was {request.status === RequestStatus.Approved ? "approved" : "declined"} on <b>{request && request.finalized_date ? new Date(request.finalized_date.seconds*1000).toLocaleString() : "loading.."}</b> by <b>{finalizer ? finalizer.name : "loading.."}</b> (<i>EID: {request.finalizer_eid}</i>)
+                                    from <b>{finalizer ? DeptDivsManager.getInstance().getDeptName(finalizer.dept_id) : "loading.."}</b>
+                                </div>
                             )}
                         </Typography>
                     </CardContent>
@@ -173,43 +183,43 @@ export function LRInfocard(props: {request: LeaveRequest}) {
         );
 }
 
-export async function issueLeaveRequest(eid: string, reason: string, leave_date: Timestamp, leave_duration: number){
-    const fr = new LeaveRequest(eid, reason, leave_date, leave_duration, Timestamp.now(), getAuthUser().eid, RequestStatus.Pending, null, null);
+export async function issueFundRequest(eid: string, reason: string, amount: number, fund_type: FundRequestFundType, dept_id: string){
+    const fr = new FundRequest(eid, reason, amount, fund_type, dept_id, Timestamp.now(), getAuthUser().eid, RequestStatus.Pending, null, null);
     
-    EmployeeUtils.getManagementEmployees().then((data) => {
+    EmployeeUtils.getFinanceEmployees().then((data) => {
         data.docs.map((emp) => {
-            Notification.insert(emp.data().eid, 'Leave Request', 'A new leave request pending approval for employee ID ' + eid + ' on ' + new Date(leave_date.seconds*1000).toLocaleString() + ' for the following reasons : ' + reason );
+            Notification.insert(emp.data().eid, 'Fund Request', 'A new fund request pending approval from ' + DeptDivsManager.getInstance().getDeptName(dept_id) + ' of IDR ' + amount);
         })
     });
 
     return await fr.insert();
 }
 
-export async function updateLeaveRequest(requestId: string, response: RequestStatus) {
+export async function updateFundRequest(requestId: string, response: RequestStatus) {
 
-    const p = await getLeaveRequest(requestId).then((letter) => {
-        const req = {id: letter.id, ...letter.data()} as LeaveRequest;
+    const p = await getFundRequest(requestId).then((letter) => {
+        const req = {id: letter.id, ...letter.data()} as FundRequest;
         const eid = req.eid;
-        const reason = req.reason;
+        const amount = req.amount;
 
         if (response === RequestStatus.Approved) {
-            Notification.insert(eid, 'Leave Request Approved', 'Your request to leave on ' + new Date(req.leave_date.seconds*1000).toLocaleString() + ' for ' + req.leave_duration + ' hours has been approved by management.');
+            Notification.insert(eid, 'Fund Request Approved', 'A fund request of IDR '+ amount +' that you issued has been approved and should be allocated shortly, please check your department funds regularly.');
         }else if (response === RequestStatus.Declined){
-            Notification.insert(eid, 'Leave Request Declined', 'Your request to leave on ' + new Date(req.leave_date.seconds*1000).toLocaleString() + ' for ' + req.leave_duration + ' hours has been declined by management.');
+            Notification.insert(eid, 'Fund Request Declined', 'A fund request of IDR '+ amount +' that you issued has been declined, please check your issued fund requests to see');
         }
-
-        const docRef = doc(database, 'leaverequests', requestId);
+    }).then(() => {
+        const docRef = doc(database, 'fundrequests', requestId);
         setDoc(docRef, { status: response, finalizer_eid: getAuthUser().eid, finalized_date: Timestamp.now() }, { merge: true });
-    });
+    })
 
     return p;
 }
 
-export async function getApprovedLeaveRequestCount(eid: string) {
+export async function getApprovedFundRequestCount(dept_id: string) {
     var count = 0;
-    return await getLeaveRequests(eid).then((data) => {
+    return await getFundRequests(dept_id).then((data) => {
         data.docs.map((doc) => {
-            if (({id: doc.id, ...doc.data()} as LeaveRequest).status === RequestStatus.Approved) {
+            if (({id: doc.id, ...doc.data()} as FundRequest).status === RequestStatus.Approved) {
                 count++;
             }
         });
@@ -218,22 +228,36 @@ export async function getApprovedLeaveRequestCount(eid: string) {
     });
 }
 
-export async function getLeaveRequest(id: string) {
-    const docRef = doc(database, 'leaverequests', id);
+export async function getAllocatedFunds(dept_id: string) {
+    var sum = 0;
+    return await getFundRequests(dept_id).then((data) => {
+        data.docs.map((doc) => {
+            const fr = {id: doc.id, ...doc.data()} as FundRequest;
+            if (fr.status === RequestStatus.Approved) {
+                sum += fr.amount;
+            }
+        });
+
+        return sum;
+    });
+}
+
+export async function getFundRequest(id: string) {
+    const docRef = doc(database, 'fundrequests', id);
     const promise = await getDoc(docRef);
 
     return promise;
 }
 
-export async function getLeaveRequests(eid: string) {
-    const q = query(db_leaverequests, where('eid', '==', eid));
+export async function getFundRequests(dept_id: string) {
+    const q = query(db_fundrequests, where('dept_id', '==', dept_id));
     const promise = await getDocs(q);
 
     return promise;
 }
 
-export async function getAllLeaveRequests() {
-    const promise = await getDocs(db_leaverequests);
+export async function getAllFundRequests() {
+    const promise = await getDocs(db_fundrequests);
 
     return promise;
 }

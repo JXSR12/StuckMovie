@@ -11,16 +11,27 @@ import { collection, DocumentData, getDocs, QueryDocumentSnapshot, QuerySnapshot
 import { database } from '../database/firebase';
 import PeopleRoundedIcon from '@material-ui/icons/PeopleRounded'
 import AppsIcon from '@material-ui/icons/Apps';
+import LocalMoviesIcon from '@material-ui/icons/LocalMovies';
 import Topbar from '../components/Topbar';
 import Sidebar from '../components/Sidebar';
 import clsx from 'clsx';
-import { Box } from '@material-ui/core';
+import { Box, Grid } from '@material-ui/core';
 import { checkAuth, getAuthUser, IAuth, logOut } from '../utils/auth_manager';
 import AppGridContainer from '../components/AppGrid';
 import { SidebarNav } from '../utils/sidebar_nav_manager';
 import { AppManager } from '../utils/apps_manager';
-import WarningIcon from '@material-ui/icons/Warning';
-import RequestTabs, { RequestType } from '../components/EmployeeRequestTabs';
+import MovieGridContainer from '../components/MovieGrid';
+import SearchBar from 'material-ui-search-bar';
+import AddIcon from '@material-ui/icons/Add';
+import FormDialog, { FormItemCombo, FormItemLongText, FormItemMultipleChip, FormItemNumber, FormItemSelect, FormItemShortText, MFOption } from '../components/InsertFormDialog';
+import { getAllProducers, Producer } from '../utils/producers_manager';
+import { Genre, getAllGenres } from '../utils/genre_manager';
+import { AgeRating, getAllAgeRatings } from '../utils/agerating_manager';
+import { insertNewMovie } from '../utils/movies_manager';
+import MultipleSelect from '../components/MultipleChipDemo';
+import FastfoodIcon from '@material-ui/icons/Fastfood';
+import { FNBMenu, getAllFNBMenus } from '../utils/fnbmenu_manager';
+import ConcessionGridContainer from '../components/ConcessionGrid';
 
 const drawerWidth = 240;
 
@@ -52,19 +63,38 @@ const useStyles = makeStyles((theme: Theme) =>
       }),
       marginLeft: drawerWidth,
     },
+    searchBar: {
+        width: '100%',
+        backgroundColor: '#ddd',
+    },
+    button: {
+      margin: theme.spacing(2)
+    }
   })
 );
 
-function MyWarningLetters() {
+function ConcessionList() {
   const classes = useStyles({});
   const [ manage, setManage ] = React.useState(false);
   const [ managReq, setManageReq ]  = React.useState(false);
   const [ auth, setAuth ] = React.useState<IAuth>(getAuthUser());
   const [ open, setOpen ] = React.useState(true);
+  const [ openCreateForm, setOpenCreateForm ] = React.useState(false);
+
+  const [ concessions, setConcessions ] = React.useState<FNBMenu[]>([]);
+
+  React.useEffect(() => {
+    getAllFNBMenus().then(e => {
+        e.docs
+    })
+  }, []);
+  const [ refreshList, setRefreshList ] = React.useState<boolean>(false);
+
+  const [ newLRError, setNewLRError ] = React.useState<boolean>(false);
+
+  const [ newLRErrMsg, setNewLRErrMsg ] = React.useState<string>('Error');
 
   const [ searched, setSearched ] = React.useState<string>("");
-
-  const [refreshList, setRefreshList] = React.useState<boolean>(false);
 
   React.useEffect(() => {
     if(auth && (auth.dept_id === 'qIvZZoS7Bnro7bD7DpWs' || auth.dept_id === '44dnLCF6Mksm8k2jn09w')){
@@ -94,6 +124,32 @@ function MyWarningLetters() {
     setSearched(searched);
   }
 
+  const cancelSearch = () => {
+    setSearched("");
+    handleSearch("");
+  };
+
+  const handleCreateNew = () => {
+    setOpenCreateForm(true);
+  }
+
+  const handleCloseForm = () => {
+    setOpenCreateForm(false);
+  }
+
+  function convertProducerMFOption(index: number, producer: Producer) : MFOption{
+    return {id: index, label: producer.name, content: producer} as MFOption;
+  }
+
+  function convertGenreMFOption(index: number, genre: Genre) : MFOption{
+    const a = {id: index, label: genre.name, content: genre} as MFOption;
+    return a;
+  }
+
+  function convertAgeRatingMFOption(index: number, agerating: AgeRating) : MFOption{
+    return {id: index, label: agerating.rating, content: agerating} as MFOption;
+  }
+
   const handleSidebarButton = SidebarNav.handleSidebarButton;
 
   const handleSearchClick = AppManager.handleDefaultSearchClick;
@@ -105,21 +161,22 @@ function MyWarningLetters() {
         [classes.contentShift]: open,
       })}>
         <Head>
-          <title>My Warning Letters - Stuck in The Movie Cinema System</title>
+          <title>Concessions - Stuck in The Movie Cinema System</title>
         </Head>
         <Box p="3rem">
             <Typography align='left' variant="h4" color="primary">
-            <WarningIcon fontSize='small'/>
-              {"   My Warning Letters"}
+            <FastfoodIcon fontSize='small'/>
+              {"   Concessions"}
               
             </Typography>
           </Box>
+        <br/>
         <div className={classes.root}>
-            <RequestTabs refreshList={refreshList} employee={getAuthUser() as IAuth} requestType={RequestType.WarningLetter} auth={auth ? true : false}/>
+            <ConcessionGridContainer/>
         </div>
       </div>
     </React.Fragment>
   );
 };
 
-export default MyWarningLetters;
+export default ConcessionList;

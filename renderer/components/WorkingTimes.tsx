@@ -16,6 +16,7 @@ import FormHelperText from "@material-ui/core/FormHelperText";
 import FormControl from "@material-ui/core/FormControl";
 import { getWorkingTimes, updateWorkingTime, WorkingTime, WorkingTimeDetail } from "../utils/workingtime_manager";
 import Grid from '@material-ui/core/Grid';
+import { Box } from '@material-ui/core';
 import _ from 'lodash'
 
 const useStyles = makeStyles((theme: Theme) =>
@@ -145,7 +146,17 @@ export default function WorkingTimeAccordion(props: {manage: boolean, eid: strin
     const [ fetchedDetails, setFetchedDetails ] = React.useState<WorkingTimeDetail[]>([placeholderWD, placeholderWD, placeholderWD, placeholderWD, placeholderWD, placeholderWD]);
     const [ bc, setBc ] = React.useState<boolean[]>([false, false, false, false, false, false]);
 
+    const [ anyChange, setAnyChange ] = React.useState(false);
+
     const [ workTimeId, setWorkTimeId ] = React.useState<string>();
+
+    React.useEffect(() => {
+      if(bc[0] || bc[1] || bc[2] || bc[3] || bc[4] || bc[5]){
+        setAnyChange(true);
+      }else{
+        setAnyChange(false);
+      }
+    }, [bc]);
 
     React.useEffect(() => {
         getWorkingTimes(eid).then((w) => {
@@ -156,12 +167,12 @@ export default function WorkingTimeAccordion(props: {manage: boolean, eid: strin
                 setCurWorkTimes(JSON.parse(JSON.stringify(workTimeDetails)));
                 setFetchedDetails(JSON.parse(JSON.stringify(workTimeDetails)));
 
-                const updatedBc = [...bc];
-                for(let i = 0; i < 6; i++){
-                  updatedBc[i] = !_.isEqual(curWorkTimes[i],fetchedDetails[i]);
-                }
-                console.log(bc);
-                setBc(updatedBc);
+                // const updatedBc = [...bc];
+                // for(let i = 0; i < 6; i++){
+                //   updatedBc[i] = !_.isEqual(curWorkTimes[i],fetchedDetails[i]);
+                // }
+                // console.log(bc);
+                // setBc(updatedBc);
             })
         })
     }, [refreshWorkTimes]);
@@ -196,6 +207,7 @@ export default function WorkingTimeAccordion(props: {manage: boolean, eid: strin
     const handleWorkTimeSave = () => {
       updateWorkingTime(workTimeId, curWorkTimes).then(() => {
         setRefreshWorkTimes(!refreshWorkTimes);
+        setBc([false, false, false, false, false, false]);
       })
     }
 
@@ -253,17 +265,19 @@ export default function WorkingTimeAccordion(props: {manage: boolean, eid: strin
               </div>
             </AccordionDetails>
             <Divider />
-            {manage && bc[dayIndex] && (
-              <AccordionActions>
-                <Button size="small" color="primary" variant="contained" onClick={handleWorkTimeSave}>
-                  Save
-                </Button>
-              </AccordionActions>
-            )
-            }
           </Accordion>
         ))}
-      
+      {manage && anyChange && (
+        <Box mt={2} mb={0} alignItems="right">
+          <Grid container justifyContent="flex-end">
+            <Button size="small" color="primary" variant="contained" onClick={handleWorkTimeSave}>
+              Save Changes
+            </Button>
+          </Grid>
+        </Box>
+            
+            )
+      }
     </div>
   );
 }

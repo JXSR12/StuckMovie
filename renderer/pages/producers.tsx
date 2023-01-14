@@ -11,20 +11,21 @@ import { collection, DocumentData, getDocs, QueryDocumentSnapshot, QuerySnapshot
 import { database } from '../database/firebase';
 import PeopleRoundedIcon from '@material-ui/icons/PeopleRounded'
 import AppsIcon from '@material-ui/icons/Apps';
+import SupervisedUserCircleIcon from '@material-ui/icons/SupervisedUserCircle';
 import Topbar from '../components/Topbar';
 import Sidebar from '../components/Sidebar';
 import clsx from 'clsx';
-import { Box } from '@material-ui/core';
+import { Box, Grid } from '@material-ui/core';
 import { checkAuth, getAuthUser, IAuth, logOut } from '../utils/auth_manager';
 import AppGridContainer from '../components/AppGrid';
 import { SidebarNav } from '../utils/sidebar_nav_manager';
 import { AppManager } from '../utils/apps_manager';
-import ExitToAppIcon from '@material-ui/icons/ExitToApp';
-import RequestTabs, { RequestType } from '../components/EmployeeRequestTabs';
+import MovieGridContainer from '../components/MovieGrid';
+import SearchBar from 'material-ui-search-bar';
 import AddIcon from '@material-ui/icons/Add';
-import Grid from '@material-ui/core/Grid';
-import FormDialog, { FormItemDateTime, FormItemLabel, FormItemLongText, FormItemNumber } from '../components/InsertFormDialog';
-import { issueLeaveRequest } from '../utils/leaverequest_manager';
+import FormDialog, { FormItemLongText, FormItemShortText } from '../components/InsertFormDialog';
+import { insertProducer } from '../utils/producers_manager';
+import ProducerGridContainer from '../components/ProducerGrid';
 
 const drawerWidth = 240;
 
@@ -56,34 +57,34 @@ const useStyles = makeStyles((theme: Theme) =>
       }),
       marginLeft: drawerWidth,
     },
+    searchBar: {
+        width: '100%',
+        backgroundColor: '#ddd',
+    },
     button: {
         margin: theme.spacing(2)
     }
   })
 );
 
-function MyLeaveRequests() {
+function MovieList() {
   const classes = useStyles({});
   const [ manage, setManage ] = React.useState(false);
   const [ managReq, setManageReq ]  = React.useState(false);
   const [ auth, setAuth ] = React.useState<IAuth>(getAuthUser());
   const [ open, setOpen ] = React.useState(true);
-
-  const [ searched, setSearched ] = React.useState<string>("");
-
   const [ openCreateForm, setOpenCreateForm ] = React.useState(false);
-
-  const [ newLeaveDate, setNewLeaveDate ] = React.useState<Date>(new Date(Date.now()));
-
-  const [ newLeaveDuration, setNewLeaveDuration ] = React.useState<number>(1);
-
-  const [ newLeaveReason, setNewLeaveReason ] = React.useState<string>('');
-
+  
   const [ newLRError, setNewLRError ] = React.useState<boolean>(false);
 
   const [ newLRErrMsg, setNewLRErrMsg ] = React.useState<string>('Error');
 
-  const [refreshList, setRefreshList] = React.useState<boolean>(false);
+  const [ searched, setSearched ] = React.useState<string>("");
+
+  const [ newProdName, setNewProdName ] = React.useState<string>("");
+  const [ newProdEmail, setNewProdEmail ] = React.useState<string>("");
+  const [ newProdPhone, setNewProdPhone ] = React.useState<string>("");
+  const [ newProdAddress, setNewProdAddress ] = React.useState<string>("");
 
   React.useEffect(() => {
     if(auth && (auth.dept_id === 'qIvZZoS7Bnro7bD7DpWs' || auth.dept_id === '44dnLCF6Mksm8k2jn09w')){
@@ -113,6 +114,11 @@ function MyLeaveRequests() {
     setSearched(searched);
   }
 
+  const cancelSearch = () => {
+    setSearched("");
+    handleSearch("");
+  };
+
   const handleCreateNew = () => {
     setOpenCreateForm(true);
   }
@@ -122,36 +128,47 @@ function MyLeaveRequests() {
   }
 
   const handleSubmitForm = () => {
-    if(newLeaveDate <= new Date(Date.now())){
-      setNewLRErrMsg("Leave date must not be before the current time");
-      setNewLRError(true);
-    }else if(newLeaveDuration < 1 || newLeaveDuration > 8){
-      setNewLRErrMsg("Leave duration must be filled and must not exceed 8 hours");
-      setNewLRError(true);
-    }else if(newLeaveReason.length === 0){
-      setNewLRErrMsg("Leave reason must be filled properly or your request will be declined");
-      setNewLRError(true);
+    if(newProdName.length < 1){
+        setNewLRErrMsg("Producer name must be filled");
+        setNewLRError(true);
+    }else if(newProdEmail.length < 1){
+        setNewLRErrMsg("Producer email address must be filled");
+        setNewLRError(true);
+    }else if(newProdPhone.length < 1){
+        setNewLRErrMsg("Producer phone number must be filled");
+        setNewLRError(true);
+    }else if(newProdAddress.length < 1){
+        setNewLRErrMsg("Producer home address must be filled");
+        setNewLRError(true);
     }else{
-      issueLeaveRequest(getAuthUser().eid, newLeaveReason, Timestamp.fromDate(newLeaveDate), newLeaveDuration).then(
-        () => {
-          setRefreshList(!refreshList);
-        }
-      )
+      insertProducer(newProdName, newProdPhone, newProdEmail, newProdAddress);
       setOpenCreateForm(false);
     }
   }
 
-  const handleDurationChange = (event: React.ChangeEvent<{ value: number }>) => {
-    setNewLeaveDuration(event.target.value);
+  const handleNameChange = (event: React.ChangeEvent<{ value: string }>) => {
+    setNewProdName(event.target.value);
   }
 
-  const handleReasonChange = (event: React.ChangeEvent<{ value: string }>) => {
-    setNewLeaveReason(event.target.value);
+  const handlePhoneChange = (event: React.ChangeEvent<{ value: string }>) => {
+    setNewProdPhone(event.target.value);
+  }
+
+  const handleEmailChange = (event: React.ChangeEvent<{ value: string }>) => {
+    setNewProdEmail(event.target.value);
+  }
+
+  const handleAddressChange = (event: React.ChangeEvent<{ value: string }>) => {
+    setNewProdAddress(event.target.value);
   }
 
   const handleSidebarButton = SidebarNav.handleSidebarButton;
 
   const handleSearchClick = AppManager.handleDefaultSearchClick;
+
+  React.useEffect(() => {
+    handleSearch("");
+  }, []);
 
   return (
     <React.Fragment>
@@ -160,48 +177,63 @@ function MyLeaveRequests() {
         [classes.contentShift]: open,
       })}>
         <Head>
-          <title>My Leave Requests - Stuck in The Movie Cinema System</title>
+          <title>Movie Producers - Stuck in The Movie Cinema System</title>
         </Head>
         <Box p="3rem">
             <Typography align='left' variant="h4" color="primary">
-            <ExitToAppIcon fontSize='small'/>
-              {"   My Leave Requests"}
+            <SupervisedUserCircleIcon fontSize='small'/>
+              {"   Movie Producers"}
               
             </Typography>
-          </Box>
+        </Box>
+        <Box mt={2} mb={2}>
+            <Grid container justifyContent="flex-end">
+                <Button
+                        variant="contained"
+                        color="primary"
+                        startIcon={<AddIcon />}
+                        className={classes.button}
+                        onClick={handleCreateNew}
+                >
+                    Create New
+                </Button>
+            </Grid>
+        </Box>
+        <SearchBar
+          value={searched}
+          onChange={(searchVal) => handleSearch(searchVal)}
+          onCancelSearch={() => cancelSearch()}
+          className={classes.searchBar}
+          placeholder="Search producer by name, email, phone number, etc.."
+        />
+        <br/>
         <div className={classes.root}>
-        <Grid container justifyContent="flex-end">
-            <Button
-                    variant="contained"
-                    color="primary"
-                    startIcon={<AddIcon />}
-                    className={classes.button}
-                    onClick={handleCreateNew}
-            >
-                Create New
-            </Button>
-        </Grid>
-            
-            <RequestTabs refreshList={refreshList} employee={getAuthUser() as IAuth} requestType={RequestType.LeaveRequest} auth={auth ? true : false}/>
-            <FormDialog 
-                title={"Create New Leave Request"} 
-                success_msg={"Successfully created new leave request!"} 
-                positive_btn_label={"Add"}
+            <ProducerGridContainer searched={searched} handleSearch={handleSearch}/>
+        </div>
+      </div>
+      <FormDialog 
+                title={"Register New Movie Producer"} 
+                success_msg={"Successfully registered new movie producer"} 
+                positive_btn_label={"Register"}
                 negative_btn_label={"Cancel"}
                 generic_err={newLRErrMsg}
                 fields={
                     [
                         {
                             id: "1",
-                            component: <FormItemDateTime value={newLeaveDate} fieldname='Leaving on ' min={new Date(Date.now())} max={new Date("2100-12-31")} handleChange={setNewLeaveDate}/>
+                            component: <FormItemShortText value={newProdName} fieldname='Producer Full Name' placeholder='Full name of the producer' minLength={0} maxLength={500} handleChange={handleNameChange}/>
                         },
                         {
                             id: "2",
-                            component: <FormItemNumber value={newLeaveDuration} fieldname='Leave Duration' unit={"hours"} min={1} max={8} handleChange={handleDurationChange}/>
+                            component: <FormItemShortText value={newProdEmail} fieldname='Producer Email Address' placeholder='Email address of the producer' minLength={0} maxLength={500} handleChange={handleEmailChange}/>
                         },
                         {
                             id: "3",
-                            component: <FormItemLongText value={newLeaveReason} fieldname='Leave Reason' placeholder='Please specify your leaving reason' minLength={0} maxLength={500} handleChange={handleReasonChange}/>
+                            component: <FormItemShortText value={newProdPhone} fieldname='Producer Phone Number' placeholder='Phone number of the producer' minLength={0} maxLength={500} handleChange={handlePhoneChange}/>
+                        },
+                        {
+                            id: "4",
+                            component: <FormItemLongText value={newProdAddress} fieldname='Producer Home Address' placeholder='Home address of the producer' minLength={0} maxLength={500} handleChange={handleAddressChange}/>
                         }
                     ]
                 }
@@ -211,10 +243,8 @@ function MyLeaveRequests() {
                 openError={newLRError}
                 setOpenError={setNewLRError}
             />
-        </div>
-      </div>
     </React.Fragment>
   );
 };
 
-export default MyLeaveRequests;
+export default MovieList;

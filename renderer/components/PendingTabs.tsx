@@ -10,16 +10,18 @@ import CancelIcon from '@material-ui/icons/Cancel';
 import HelpIcon from '@material-ui/icons/Help';
 import KeyboardArrowRightIcon from '@material-ui/icons/KeyboardArrowRight';
 import Box from '@material-ui/core/Box';
-import { Avatar, Button, IconButton, List, ListItem, ListItemAvatar, ListItemSecondaryAction, ListItemText, TextField, Tooltip } from '@material-ui/core';
+import { Avatar, Button, IconButton, List, ListItem, ListItemAvatar, ListItemSecondaryAction, ListItemText, Snackbar, TextField, Tooltip } from '@material-ui/core';
 import { WLRequestListItem, getAllWarningLetters, getWarningLetter, getWarningLetters, updateWarningLetter, WarningLetter, WLInfocard } from '../utils/warningletter_manager';
 import { EmployeeUtils } from '../utils/employee_manager';
 import { getAuthUser, IAuth } from '../utils/auth_manager';
 import StepperDialog, { StepperStepItem } from './StepperDialog';
 import { validatePassword } from '../utils/passwordencryptor';
-import { ToggleButton, ToggleButtonGroup } from '@material-ui/lab';
+import { Alert, ToggleButton, ToggleButtonGroup } from '@material-ui/lab';
 import { Request } from '../utils/requests_manager';
 import { FiringRequest, FRInfocard, FRRequestListItem, getAllFiringRequests, getFiringRequest, updateFiringRequest } from '../utils/firingrequest_manager';
 import { getAllLeaveRequests, getLeaveRequest, LeaveRequest, LRInfocard, LRRequestListItem, updateLeaveRequest } from '../utils/leaverequest_manager';
+import { getAllSalaryAdjustments, getSalaryAdjustment, SAInfocard, SalaryAdjustment, SARequestListItem, updateSalaryAdjustment } from '../utils/salaryadjustments_manager';
+import { FNInfocard, FNRequestListItem, FundRequest, getAllFundRequests, getFundRequest, updateFundRequest } from '../utils/fundrequests_manager';
 
 interface TabPanelProps {
   title: string;
@@ -71,6 +73,20 @@ function GenerateList(props: GenerateListProps) {
       <div>
         {items.map(item => 
           <FRRequestListItem request={item as FiringRequest} handleOpen={handleOpenDialog}/>
+        )}
+      </div>);
+  }else if(index === 'four'){
+    return(
+      <div>
+        {items.map(item => 
+          <SARequestListItem request={item as SalaryAdjustment} handleOpen={handleOpenDialog}/>
+        )}
+      </div>);
+  }else if(index === 'five'){
+    return(
+      <div>
+        {items.map(item => 
+          <FNRequestListItem request={item as FundRequest} handleOpen={handleOpenDialog}/>
         )}
       </div>);
   }
@@ -176,13 +192,16 @@ const useStyles = makeStyles((theme: Theme) => ({
   },
 }));
 
-export default function PendingTabs() {
+export default function PendingTabs(props: {auth: boolean}) {
+  const {auth} = props;
   const classes = useStyles();
   const [value, setValue] = React.useState('one');
   const [openDialog, setOpenDialog] = React.useState(false);
   const [warningLetters, setWarningLetters] = React.useState<WarningLetter[]>([]);
   const [leaveRequests, setLeaveRequests] = React.useState<LeaveRequest[]>([]);
   const [firingRequests, setFiringRequests] = React.useState<FiringRequest[]>([]);
+  const [salaryAdjustments, setSalaryAdjustments] = React.useState<SalaryAdjustment[]>([]);
+  const [fundRequests, setFundRequests] = React.useState<FundRequest[]>([]);
   const [pwd, setPwd] = React.useState<string>('');
   const [reqItemId, setReqItemId] = React.useState<string>('');
   const [reviewContent, setReviewContent] = React.useState<Element>(null);
@@ -226,6 +245,26 @@ export default function PendingTabs() {
       console.log('Retrieved all firing requests');
     });
 
+    getAllSalaryAdjustments().then((data) => {
+      setSalaryAdjustments(
+        data.docs.map((doc) => {
+          const request = {id: doc.id, ...doc.data()} as SalaryAdjustment;
+          console.log(request);
+          return request;
+        }));
+      console.log('Retrieved all salary adjustments');
+    });
+
+    getAllFundRequests().then((data) => {
+      setFundRequests(
+        data.docs.map((doc) => {
+          const request = {id: doc.id, ...doc.data()} as FundRequest;
+          console.log(request);
+          return request;
+        }));
+      console.log('Retrieved all fund requests');
+    });
+
   }, [refreshList]);
 
   const handleOpenWLDialog = (id: string) => {
@@ -267,13 +306,38 @@ export default function PendingTabs() {
     });
   }
 
+  const handleOpenSADialog = (id: string) => {
+    setReqItemId(id);
+    getSalaryAdjustment(id).then((doc) => {
+      const request = {id: doc.id, ...doc.data()} as SalaryAdjustment;
+      if(request.status === RequestStatus.Pending){
+        setStepperItems([reviewRequestStepperItem(<SAInfocard request={request}/>), chooseDecisionStepperItem(handleDecision), confirmPasswordStepperItem(setPwd)]);
+      }else{
+        setStepperItems([viewRequestStepperItem(<SAInfocard request={request}/>)]);
+      }
+      setOpenDialog(true);
+    });
+  }
+
+  const handleOpenFNDialog = (id: string) => {
+    setReqItemId(id);
+    getFundRequest(id).then((doc) => {
+      const request = {id: doc.id, ...doc.data()} as FundRequest;
+      if(request.status === RequestStatus.Pending){
+        setStepperItems([reviewRequestStepperItem(<FNInfocard request={request}/>), chooseDecisionStepperItem(handleDecision), confirmPasswordStepperItem(setPwd)]);
+      }else{
+        setStepperItems([viewRequestStepperItem(<FNInfocard request={request}/>)]);
+      }
+      setOpenDialog(true);
+    });
+  }
+
   const handleChange = (event: React.ChangeEvent<{}>, newValue: string) => {
     setValue(newValue);
   };
 
   const handleFinishDialog = () => {
     validatePassword(pwd, getAuthUser().password).then((res) => {
-      setPwd('');
       
       if(res === true){
         if(decision === 'approve'){
@@ -287,6 +351,14 @@ export default function PendingTabs() {
             });
           }else if(value === 'three'){
             updateFiringRequest(reqItemId, RequestStatus.Approved).then(() => {
+              setRefreshList(!refreshList);
+            });
+          }else if(value === 'four'){
+            updateSalaryAdjustment(reqItemId, RequestStatus.Approved).then(() => {
+              setRefreshList(!refreshList);
+            });
+          }else if(value === 'five'){
+            updateFundRequest(reqItemId, RequestStatus.Approved).then(() => {
               setRefreshList(!refreshList);
             });
           }
@@ -305,30 +377,71 @@ export default function PendingTabs() {
             updateFiringRequest(reqItemId, RequestStatus.Declined).then(() => {
               setRefreshList(!refreshList);
             });
+          }else if(value === 'four'){
+            updateSalaryAdjustment(reqItemId, RequestStatus.Declined).then(() => {
+              setRefreshList(!refreshList);
+            });
+          }else if(value === 'five'){
+            updateFundRequest(reqItemId, RequestStatus.Declined).then(() => {
+              setRefreshList(!refreshList);
+            });
           }
           
           setDecision('approve');
         }
+      }else if(pwd.length !== 0){
+        setOpenSnackbar(true);
       }
 
+      setPwd('');
       
     });
   }
 
+  const [openSnackbar, setOpenSnackbar] = React.useState(false);
+
+    const handleSnackbarClose = () => {
+        setOpenSnackbar(false);
+    }
+
   return (
     <div className={classes.root}>
       <AppBar position="static">
-        <Tabs value={value} onChange={handleChange} aria-label="request-tabs">
-          <Tab value="one" label="Warning Letters" wrapped {...a11yProps('one')} />
-          <Tab value="two" label="Leave Requests" wrapped {...a11yProps('two')} />
-          <Tab value="three" label="Firing Requests" wrapped {...a11yProps('three')} />
-        </Tabs>
+        
+          {auth && getAuthUser().dept_id === 'qIvZZoS7Bnro7bD7DpWs' && (
+            <Tabs value={value} onChange={handleChange} aria-label="request-tabs">
+              <Tab value="one" label="Warning Letters" wrapped {...a11yProps('one')} />
+              <Tab value="two" label="Leave Requests" wrapped {...a11yProps('two')} />
+              <Tab value="three" label="Firing Requests" wrapped {...a11yProps('three')} />
+              <Tab value="four" label="Salary Adjustments" wrapped {...a11yProps('four')} />
+            </Tabs>
+          )}
+          {auth && getAuthUser().dept_id === '8vJjhyQeZh12eb9MBe1U' && (
+            <Tabs value={value} onChange={handleChange} aria-label="request-tabs">
+              <Tab value="five" label="Fund Requests" wrapped {...a11yProps('five')} />
+            </Tabs>
+          )}
+          
       </AppBar>
-      <TabPanel handleOpenDialog={handleOpenWLDialog} items={warningLetters} title={'Below are the warning letters pending your approval'} value={value} index="one"/>
-      <TabPanel handleOpenDialog={handleOpenLRDialog} items={leaveRequests} title={'Below are the leave requests pending your approval'} value={value} index="two"/>
-      <TabPanel handleOpenDialog={handleOpenFRDialog} items={firingRequests} title={'Below are the firing requests pending your approval'} value={value} index="three"/>
+      {auth && getAuthUser().dept_id === 'qIvZZoS7Bnro7bD7DpWs' && (
+        <div>
+          <TabPanel handleOpenDialog={handleOpenWLDialog} items={warningLetters} title={'Below are the warning letters pending your approval'} value={value} index="one"/>
+          <TabPanel handleOpenDialog={handleOpenLRDialog} items={leaveRequests} title={'Below are the leave requests pending your approval'} value={value} index="two"/>
+          <TabPanel handleOpenDialog={handleOpenFRDialog} items={firingRequests} title={'Below are the firing requests pending your approval'} value={value} index="three"/>
+          <TabPanel handleOpenDialog={handleOpenSADialog} items={salaryAdjustments} title={'Below are the salary adjustments pending your approval'} value={value} index="four"/>
+        </div>
+      )}
+      {auth && getAuthUser().dept_id === '8vJjhyQeZh12eb9MBe1U' && (
+        <TabPanel handleOpenDialog={handleOpenFNDialog} items={fundRequests} title={'Below are the fund requests pending your approval'} value={value} index="five"/>
+      )}
+      
 
       <StepperDialog openDialog={openDialog} setOpenDialog={setOpenDialog} onDialogFinish={handleFinishDialog} items={stepperItems}/>
+      <Snackbar open={openSnackbar} autoHideDuration={3000} onClose={handleSnackbarClose}>
+          <Alert onClose={handleSnackbarClose} severity="error">
+              Provided account password is incorrect
+          </Alert>
+      </Snackbar>
     </div>
   );
 }

@@ -51,6 +51,7 @@ function Next() {
   const [ managReq, setManageReq ]  = React.useState(false);
   const [ warnletter, setWarnletter ] = React.useState(false);
   const [ changeWorkTime, setChangeWorkTime ] = React.useState(false);
+  const [ adjustSalary, setAdjustSalary ] = React.useState(false);
   const [ auth, setAuth ] = React.useState<IAuth>(getAuthUser());
   const [ open, setOpen ] = React.useState(true);
 
@@ -66,6 +67,7 @@ function Next() {
     if(auth.dept_id === '44dnLCF6Mksm8k2jn09w'){
       setWarnletter(true);
       setChangeWorkTime(true);
+      setAdjustSalary(true);
     }
 
     console.log('Authed: ' + auth + '| object: ' + auth);
@@ -109,7 +111,7 @@ function Next() {
               
             </Typography>
           </Box>
-          {manage && (<ManageTable changeWorkTime={changeWorkTime} access={manage} giveWarnLetter={warnletter}></ManageTable>)}
+          {manage && (<ManageTable adjustSalary={adjustSalary} changeWorkTime={changeWorkTime} access={manage} giveWarnLetter={warnletter}></ManageTable>)}
         </div>
       </div>
     </React.Fragment>

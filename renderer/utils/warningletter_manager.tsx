@@ -148,7 +148,7 @@ export function WLInfocard(props: {letter: WarningLetter}) {
                             </Box>
                             
     
-                            This letter was issued on <b>{letter.issued_date.toDate().toLocaleString()}</b> by <b>{issuer ? issuer.name : "loading.."}</b> (<i>EID: {letter.issuer_eid}</i>)
+                            This letter was issued on <b>{new Date(letter.issued_date.seconds*1000).toLocaleString()}</b> by <b>{issuer ? issuer.name : "loading.."}</b> (<i>EID: {letter.issuer_eid}</i>)
                             from <b>{issuer ? DeptDivsManager.getInstance().getDeptName(issuer.dept_id) : "loading.."}</b>
     
                             {letter.status !== RequestStatus.Pending && (
@@ -156,7 +156,7 @@ export function WLInfocard(props: {letter: WarningLetter}) {
                                 <Box m={3}>
                                     <Divider light variant='fullWidth'/>
                                 </Box>
-                                This letter was {letter.status === RequestStatus.Approved ? "approved" : "declined"} on <b>{letter.finalized_date.toDate().toLocaleString()}</b> by <b>{finalizer ? finalizer.name : "loading.."}</b> (<i>EID: {letter.finalizer_eid}</i>)
+                                This letter was {letter.status === RequestStatus.Approved ? "approved" : "declined"} on <b>{new Date(letter.finalized_date.seconds*1000).toLocaleString()}</b> by <b>{finalizer ? finalizer.name : "loading.."}</b> (<i>EID: {letter.finalizer_eid}</i>)
                                 from <b>{finalizer ? DeptDivsManager.getInstance().getDeptName(finalizer.dept_id) : "loading.."}</b>
                             </div>
                             )}

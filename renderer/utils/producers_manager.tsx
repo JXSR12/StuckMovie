@@ -45,6 +45,11 @@ export class Producer {
     }
 }
 
+export async function insertProducer(name: string, phone: string, email: string, address: string){
+    const pr : Producer = new Producer("ID", name, email, phone, address);
+    pr.insert();
+}
+
 export async function getProducer(id: string) {
     const docRef = doc(database, 'producers', id);
     const promise = await getDoc(docRef);

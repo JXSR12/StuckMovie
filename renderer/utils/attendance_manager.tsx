@@ -1,9 +1,10 @@
 import { faker } from "@faker-js/faker";
-import { addDoc, collection, getDocs, Timestamp } from "firebase/firestore";
+import { addDoc, arrayRemove, arrayUnion, collection, doc, getDocs, query, setDoc, Timestamp, where } from "firebase/firestore";
 import { database } from "../database/firebase";
 import { IAuth } from "./auth_manager";
 import { EmployeeUtils } from "./employee_manager";
 import { getWorkingTimes, WorkingTime, WorkingTimeDetail } from "./workingtime_manager";
+import _ from 'lodash'
 
 const db_attendances = collection(database, 'attendances');
 
@@ -349,6 +350,54 @@ export class Attendance {
             })
         })
     }
+}
+
+export async function insertNewAttendance(eid: string, att_item: AttendanceItem){
+    function filterToday(attendanceItem : AttendanceItem){
+        const today = new Date();
+        return attendanceItem.year === today.getFullYear() && attendanceItem.month === today.getMonth()+1 && attendanceItem.day === today.getDate()
+    }
+
+    getEmployeeAttendance(eid).then(e => {
+       const att_id = e.docs[0].id
+       const docRef = doc(database, 'attendances', att_id);
+
+       const attendances = ({...e.docs[0].data()} as Attendance).attendances;
+       var att = attendances.filter(filterToday).length > 0 ? attendances.filter(filterToday)[0] : null;
+
+       var newAtt = attendances.filter(attn => !_.isEqual(attn, att));
+       newAtt.push(att_item);
+
+        setDoc(docRef, {
+            attendances: newAtt
+        }, {merge: true});
+    })
+}
+
+export async function resetAttendance(eid: string, date: Date){
+    function filterDate(attendanceItem : AttendanceItem){
+        return attendanceItem.year === date.getFullYear() && attendanceItem.month === date.getMonth()+1 && attendanceItem.day === date.getDate()
+    }
+
+    getEmployeeAttendance(eid).then(e => {
+        const att_id = e.docs[0].id
+        const docRef = doc(database, 'attendances', att_id);
+ 
+        const attendances = ({...e.docs[0].data()} as Attendance).attendances;
+        var att = attendances.filter(filterDate).length > 0 ? attendances.filter(filterDate)[0] : null;
+
+        setDoc(docRef, {
+            attendances: arrayRemove(att)
+        }, {merge: true});
+     })
+}
+
+
+
+export async function getEmployeeAttendance(eid: string){
+    const q = await query(db_attendances, where("eid", "==", eid));
+    
+    return getDocs(q);
 }
 
 export async function getAllAttendances() {

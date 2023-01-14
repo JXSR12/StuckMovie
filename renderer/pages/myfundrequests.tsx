@@ -23,8 +23,11 @@ import ExitToAppIcon from '@material-ui/icons/ExitToApp';
 import RequestTabs, { RequestType } from '../components/EmployeeRequestTabs';
 import AddIcon from '@material-ui/icons/Add';
 import Grid from '@material-ui/core/Grid';
-import FormDialog, { FormItemDateTime, FormItemLabel, FormItemLongText, FormItemNumber } from '../components/InsertFormDialog';
+import FormDialog, { FormItemDateTime, FormItemLabel, FormItemLongText, FormItemNumber, FormItemSelect } from '../components/InsertFormDialog';
 import { issueLeaveRequest } from '../utils/leaverequest_manager';
+import DeptDivsManager from '../utils/deptsdivs_manager';
+import { FundRequestFundType, issueFundRequest } from '../utils/fundrequests_manager';
+import MonetizationOnIcon from '@material-ui/icons/MonetizationOn';
 
 const drawerWidth = 240;
 
@@ -62,7 +65,7 @@ const useStyles = makeStyles((theme: Theme) =>
   })
 );
 
-function MyLeaveRequests() {
+function MyFundRequests() {
   const classes = useStyles({});
   const [ manage, setManage ] = React.useState(false);
   const [ managReq, setManageReq ]  = React.useState(false);
@@ -73,11 +76,11 @@ function MyLeaveRequests() {
 
   const [ openCreateForm, setOpenCreateForm ] = React.useState(false);
 
-  const [ newLeaveDate, setNewLeaveDate ] = React.useState<Date>(new Date(Date.now()));
+  const [ newAmount, setNewAmount ] = React.useState<number>(1);
 
-  const [ newLeaveDuration, setNewLeaveDuration ] = React.useState<number>(1);
+  const [ newReason, setNewReason ] = React.useState<string>('');
 
-  const [ newLeaveReason, setNewLeaveReason ] = React.useState<string>('');
+  const [ newAlloc, setNewAlloc ] = React.useState<FundRequestFundType>(FundRequestFundType.Cash);
 
   const [ newLRError, setNewLRError ] = React.useState<boolean>(false);
 
@@ -122,17 +125,14 @@ function MyLeaveRequests() {
   }
 
   const handleSubmitForm = () => {
-    if(newLeaveDate <= new Date(Date.now())){
-      setNewLRErrMsg("Leave date must not be before the current time");
+    if(newAmount < 1){
+      setNewLRErrMsg("Request amount must be more than 0");
       setNewLRError(true);
-    }else if(newLeaveDuration < 1 || newLeaveDuration > 8){
-      setNewLRErrMsg("Leave duration must be filled and must not exceed 8 hours");
-      setNewLRError(true);
-    }else if(newLeaveReason.length === 0){
-      setNewLRErrMsg("Leave reason must be filled properly or your request will be declined");
+    }else if(newReason.length === 0){
+      setNewLRErrMsg("Request reason must be filled properly or your request will be declined");
       setNewLRError(true);
     }else{
-      issueLeaveRequest(getAuthUser().eid, newLeaveReason, Timestamp.fromDate(newLeaveDate), newLeaveDuration).then(
+      issueFundRequest(getAuthUser().eid, newReason, newAmount, newAlloc, getAuthUser().dept_id).then(
         () => {
           setRefreshList(!refreshList);
         }
@@ -141,12 +141,16 @@ function MyLeaveRequests() {
     }
   }
 
-  const handleDurationChange = (event: React.ChangeEvent<{ value: number }>) => {
-    setNewLeaveDuration(event.target.value);
+  const handleAmountChange = (event: React.ChangeEvent<{ value: number }>) => {
+    setNewAmount(event.target.value);
   }
 
   const handleReasonChange = (event: React.ChangeEvent<{ value: string }>) => {
-    setNewLeaveReason(event.target.value);
+    setNewReason(event.target.value);
+  }
+
+  const handleAllocChange = (event: React.ChangeEvent<{ value: number }>) => {
+    setNewAlloc(event.target.value as FundRequestFundType);
   }
 
   const handleSidebarButton = SidebarNav.handleSidebarButton;
@@ -160,12 +164,12 @@ function MyLeaveRequests() {
         [classes.contentShift]: open,
       })}>
         <Head>
-          <title>My Leave Requests - Stuck in The Movie Cinema System</title>
+          <title>Fund Requests - Stuck in The Movie Cinema System</title>
         </Head>
         <Box p="3rem">
             <Typography align='left' variant="h4" color="primary">
-            <ExitToAppIcon fontSize='small'/>
-              {"   My Leave Requests"}
+            <MonetizationOnIcon fontSize='small'/>
+              {"   " + (getAuthUser() ? DeptDivsManager.getInstance().getDeptName(getAuthUser().dept_id) : "") + " Funds"}
               
             </Typography>
           </Box>
@@ -178,14 +182,14 @@ function MyLeaveRequests() {
                     className={classes.button}
                     onClick={handleCreateNew}
             >
-                Create New
+                Make New Fund Request
             </Button>
         </Grid>
             
-            <RequestTabs refreshList={refreshList} employee={getAuthUser() as IAuth} requestType={RequestType.LeaveRequest} auth={auth ? true : false}/>
+            <RequestTabs refreshList={refreshList} employee={getAuthUser() as IAuth} requestType={RequestType.FundRequest} auth={auth ? true : false}/>
             <FormDialog 
-                title={"Create New Leave Request"} 
-                success_msg={"Successfully created new leave request!"} 
+                title={"Make New Fund Request"} 
+                success_msg={"Successfully made new fund request!"} 
                 positive_btn_label={"Add"}
                 negative_btn_label={"Cancel"}
                 generic_err={newLRErrMsg}
@@ -193,15 +197,20 @@ function MyLeaveRequests() {
                     [
                         {
                             id: "1",
-                            component: <FormItemDateTime value={newLeaveDate} fieldname='Leaving on ' min={new Date(Date.now())} max={new Date("2100-12-31")} handleChange={setNewLeaveDate}/>
+                            component: <FormItemSelect<number> value={newAlloc} fieldname='Fund Allocation Method' placeholder='Preferred method of allocation' options={[
+                                {id: 0, label: "Cash", content: FundRequestFundType.Cash},
+                                {id: 1, label: "Company Card", content: FundRequestFundType.Card},
+                                {id: 2, label: "Bank Transfer", content: FundRequestFundType.BankTransfer},
+                                {id: 3, label: "Reimbursement", content: FundRequestFundType.Reimbursement},
+                            ]} handleChange={handleAllocChange}/>
                         },
                         {
                             id: "2",
-                            component: <FormItemNumber value={newLeaveDuration} fieldname='Leave Duration' unit={"hours"} min={1} max={8} handleChange={handleDurationChange}/>
+                            component: <FormItemNumber value={newAmount} fieldname='Request Amount' min={0} max={99999999999} handleChange={handleAmountChange} unit={"IDR"}/>
                         },
                         {
                             id: "3",
-                            component: <FormItemLongText value={newLeaveReason} fieldname='Leave Reason' placeholder='Please specify your leaving reason' minLength={0} maxLength={500} handleChange={handleReasonChange}/>
+                            component: <FormItemLongText value={newReason} fieldname='Request Reason/Purpose' placeholder='Please specify the reason or purpose of this fund request' minLength={0} maxLength={500} handleChange={handleReasonChange}/>
                         }
                     ]
                 }
@@ -217,4 +226,4 @@ function MyLeaveRequests() {
   );
 };
 
-export default MyLeaveRequests;
+export default MyFundRequests;

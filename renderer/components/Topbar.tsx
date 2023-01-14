@@ -28,10 +28,11 @@ import TimeAgo from 'javascript-time-ago';
 import en from 'javascript-time-ago/locale/en'
 import { collection, doc, onSnapshot, Timestamp } from 'firebase/firestore';
 import { database } from '../database/firebase';
-import { IAuth } from '../utils/auth_manager';
+import { getAuthUser, IAuth } from '../utils/auth_manager';
 import SearchBar from 'material-ui-search-bar';
 import Router from 'next/router';
 import { SidebarNav } from '../utils/sidebar_nav_manager';
+import { EmployeeInfocard } from './EmployeeCardDialog';
 
 TimeAgo.addDefaultLocale(en);
 
@@ -138,6 +139,8 @@ export default function Topbar(props: TopbarProps) {
   const [notifs, setNotifs] = React.useState<Notification[]>([]);
   const { handleOpenDrawer, handleLogOut, handleSearch, handleSearchClick } = props;
   const [open, setOpen] = React.useState(true);
+  const [openProfileDetails, setOpenProfileDetails] = React.useState(false);
+
   var auth = secureLocalStorage.getItem('auth') as IAuth;
   const db_notifcounts = collection(database, 'notifcounts');
   var unsub;
@@ -281,6 +284,10 @@ export default function Topbar(props: TopbarProps) {
     handleMobileMenuClose();
   };
 
+  const handleMenuProfileDetails = () => {
+    setOpenProfileDetails(true);
+  }
+
   const handleMobileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setMobileMoreAnchorEl(event.currentTarget);
   };
@@ -296,7 +303,7 @@ export default function Topbar(props: TopbarProps) {
       open={isMenuOpen}
       onClose={handleMenuClose}
     >
-      <MenuItem onClick={handleMenuClose}>My Employee Profile</MenuItem>
+      <MenuItem onClick={handleMenuProfileDetails}>My Employee Profile</MenuItem>
       <MenuItem onClick={handleLogOut}>Log Out</MenuItem>
     </Menu>
   );
@@ -440,6 +447,8 @@ export default function Topbar(props: TopbarProps) {
       {renderMobileMenu}
       {renderMenu}
       {renderNotificationList}
+
+      <EmployeeInfocard employee={getAuthUser()} openDialog={openProfileDetails} setOpenDialog={setOpenProfileDetails} onDialogFinish={handleMenuClose} />
     </div>
   );
 }

@@ -19,7 +19,9 @@ import FormControlLabel from '@material-ui/core/FormControlLabel';
 import Switch from '@material-ui/core/Switch';
 import HighlightOffIcon from '@material-ui/icons/HighlightOff';
 import AssignmentLateRoundedIcon from '@material-ui/icons/AssignmentLateRounded';
+import PermIdentityIcon from '@material-ui/icons/PermIdentity';
 import FilterListIcon from '@material-ui/icons/FilterList';
+import LocalAtmIcon from '@material-ui/icons/LocalAtm';
 import ScheduleIcon from '@material-ui/icons/Schedule';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { database } from '../database/firebase';
@@ -30,6 +32,10 @@ import { getApprovedWarningLetterCount, issueWarningLetter } from '../utils/warn
 import EmptyDialog from './EmptyDialog';
 import WorkingTimeAccordion from './WorkingTimes';
 import { EmployeeUtils } from '../utils/employee_manager';
+import { EmployeeInfocard } from './EmployeeCardDialog';
+import { getAuthUser, IAuth } from '../utils/auth_manager';
+import FormDialog, { FormItem, FormItemBeforeAfterNumber } from './InsertFormDialog';
+import { issueSalaryAdjustment } from '../utils/salaryadjustments_manager';
 
 const db_employees = collection(database, 'employees');
 const db_departments = collection(database, 'departments');
@@ -189,16 +195,19 @@ interface EnhancedTableToolbarProps {
   selected: string;
   searchBar: any;
   giveWarnLetter: boolean;
+  adjustSalary: boolean;
   changeWorkTime: boolean;
   
   handleIssueLetterOpen: (eid: string) => void;
   handleWorkingTime: (eid: string) => void;
+  handleEmployeeDetails: (eid: string) => void;
+  handleAdjustSalary: (eid: string) => void;
   handleClearSelection: () => void;
 }
 
 const EnhancedTableToolbar = (props: EnhancedTableToolbarProps) => {
   const classes = useToolbarStyles();
-  const { numSelected, selected, searchBar, handleIssueLetterOpen, handleWorkingTime, handleClearSelection, giveWarnLetter, changeWorkTime } = props;
+  const { numSelected, selected, searchBar, handleIssueLetterOpen, handleWorkingTime, handleClearSelection, giveWarnLetter, adjustSalary, changeWorkTime, handleEmployeeDetails, handleAdjustSalary} = props;
 
   const handleIssueLetterClick = () => {
     handleIssueLetterOpen(selected)
@@ -206,6 +215,14 @@ const EnhancedTableToolbar = (props: EnhancedTableToolbarProps) => {
 
   const handleWorkingTimeClick = () => {
     handleWorkingTime(selected)
+  }
+
+  const handleEmployeeDetailsClick = () => {
+    handleEmployeeDetails(selected)
+  }
+
+  const handleAdjustSalaryClick = () => {
+    handleAdjustSalary(selected)
   }
 
   return (
@@ -239,6 +256,24 @@ const EnhancedTableToolbar = (props: EnhancedTableToolbarProps) => {
         <Tooltip title="Issue Warning Letter">
           <IconButton aria-label="warning-letter" style={{color: 'white'}} onClick={handleIssueLetterClick}>
             <AssignmentLateRoundedIcon />
+          </IconButton>
+        </Tooltip>
+        </div>
+      )}
+      {numSelected > 0 && numSelected <= 10 && adjustSalary && (
+        <div>
+        <Tooltip title="Adjust Salaries">
+          <IconButton aria-label="adjust-salary" style={{color: 'white'}} onClick={handleAdjustSalaryClick}>
+            <LocalAtmIcon />
+          </IconButton>
+        </Tooltip>
+        </div>
+      )}
+      {numSelected == 1 && (
+        <div>
+        <Tooltip title="View Employee Details">
+          <IconButton aria-label="details" style={{color: 'white'}} onClick={handleEmployeeDetailsClick}>
+            <PermIdentityIcon />
           </IconButton>
         </Tooltip>
         </div>
@@ -329,7 +364,13 @@ function getDivName(divId: string | number) : string{
   return ret;
 }
 
-export default function ManageTable({access, giveWarnLetter, changeWorkTime}: {access: boolean, giveWarnLetter: boolean, changeWorkTime: boolean}) {
+export interface SalaryChange{
+  eid: string
+  from: string
+  to: string
+}
+
+export default function ManageTable({access, giveWarnLetter, changeWorkTime, adjustSalary}: {access: boolean, giveWarnLetter: boolean, changeWorkTime: boolean, adjustSalary: boolean}) {
 
   const classes = useStyles();
   const [order, setOrder] = React.useState<Order>('asc');
@@ -344,15 +385,28 @@ export default function ManageTable({access, giveWarnLetter, changeWorkTime}: {a
   const [originalRows, setOriginalRows] = React.useState<Data[]>([]);
   const [internalRows, setInternalRows] = React.useState<Data[]>([]);
   const [openIssueLetter, setOpenIssueLetter] = React.useState(false);
-  const [openDetailDialog, setOpenDetailDialog] = React.useState(false);
+  const [openWorktimeDialog, setOpenWorktimeDialog] = React.useState(false);
+
+  const [openDetailsDialog, setOpenDetailsDialog] = React.useState(false);
+  const [openSalaryDialog, setOpenSalaryDialog] = React.useState(false);
+
+  const [salaryAdjustmentFields, setSalaryAdjustmentFields] = React.useState<FormItem[]>([]);
+
   const [openSnackbar, setOpenSnackbar] = React.useState(false);
 
   const [openDiv, setOpenDiv] = React.useState(false);
   const [warningReason, setWarningReason] = React.useState<string>('UNDEFINEDREASON');
 
+  const [adjEmployees, setAdjEmployees] = React.useState<string[]>([]);
+  const [empDocs, setEmpDocs] = React.useState([]);
+
   const [selEmployee, setSelEmployee] = React.useState<Data>();
+  const [fullSelEmployee, setFullSelEmployee ] = React.useState<IAuth>();
   const [selEmpLettersCount, setSelEmpLettersCount] = React.useState(0);
   const [selEmpLettersFetched, setSelEmpLettersFetched] = React.useState(false);
+
+  const [oldSalaries, setOldSalaries] = React.useState<number[]>([]);
+  const [newSalaries, setNewSalaries] = React.useState<number[]>([]);
 
   const [openIssueLetterAlert, setOpenIssueLetterAlert] = React.useState(false);
 
@@ -370,7 +424,6 @@ export default function ManageTable({access, giveWarnLetter, changeWorkTime}: {a
 
   const handleIssueLetterOpen = (eid: string) => {
     setSelEmpLettersFetched(false);
-    setOpenIssueLetter(true);
     const q = query(db_employees, where('eid', '==', eid));
 
     const wl = query(db_warningletters,  where('eid', '==', eid));
@@ -390,11 +443,11 @@ export default function ManageTable({access, giveWarnLetter, changeWorkTime}: {a
             setSelEmpLettersCount(count);
             setSelEmpLettersFetched(true);
           });
+          setOpenIssueLetter(true);
         });
   }
 
   const handleWorkingTime = (eid: string) => {
-    setOpenDetailDialog(true);
     EmployeeUtils.getEmployee(eid).then((data) => {
       setSelEmployee({
         eid: data.docs[0].data().eid,
@@ -405,8 +458,124 @@ export default function ManageTable({access, giveWarnLetter, changeWorkTime}: {a
         ephone: data.docs[0].data().phone,
         esalary: data.docs[0].data().salary,
       });
+      setOpenWorktimeDialog(true);
     })
   }
+
+  const handleViewDetails = (eid: string) => {
+    EmployeeUtils.getEmployee(eid).then((data) => {
+      setFullSelEmployee(
+        {...data.docs[0].data()} as IAuth
+      );
+      setOpenDetailsDialog(true);
+    })
+  }
+
+  const handleSalaryAdjustmentChange = (event: React.ChangeEvent<{ value: string }>, index: number) => {
+    newSalaries[index] = Number.parseInt(event.target.value);
+
+    setNewSalaries(JSON.parse(JSON.stringify(newSalaries)));
+    console.log('EID: ' + adjEmployees)
+    console.log('Before: ' + oldSalaries);
+    console.log('After: ' + newSalaries);
+  }
+
+  React.useEffect(() => {
+    console.log('New Salaries: ' + newSalaries);
+  }, [newSalaries])
+
+  const handleCloseSalaryAdjustment = () => {
+    setOpenSalaryDialog(false);
+  }
+
+  const [ salaryAdjustmentError, setSalaryAdjustmentError ] = React.useState<boolean>(false);
+
+  function validateSalaryAdjustments() : boolean{
+    newSalaries.forEach(e => {
+      if(e === 0) return false;
+    })
+
+    return true;
+  }
+
+  React.useEffect(() => {
+    setOldSalaries([]);
+    setNewSalaries([]);
+  }, [selected]);
+
+  const handleSalaryAdjustmentSubmit = () => {
+    console.log("OLD: " + oldSalaries);
+    console.log("NEW: " + newSalaries);
+    if(!validateSalaryAdjustments()){
+      setSalaryAdjustmentError(true);
+    }else{
+      adjEmployees.map((eid, idx) => {
+        var today = new Date();
+        var year = today.getFullYear();
+        var month = today.getMonth();
+        var quarter;
+        if (month < 3)
+          quarter = 1;
+        else if (month < 6)
+          quarter = 2;
+        else if (month < 9)
+          quarter = 3;
+        else if (month < 12)
+          quarter = 4;
+        issueSalaryAdjustment(eid, "HRD Quarterly Salary Adjustment (Q"+quarter + " " + year +")", oldSalaries[idx], newSalaries[idx]);
+      })
+      setOpenSalaryDialog(false);
+    }
+  }
+
+  const handleSalaryAdjustment = (eids : string[]) => {
+    setOldSalaries([]);
+    setNewSalaries([]);
+    EmployeeUtils.getEmployeesByIds(eids).then((emps) => {
+      var count = 0;
+      var newsalaries = [];
+      var oldsalaries = [];
+      for(let i = 0; i < emps.size; i++){
+        newsalaries.push(emps.docs[i].data().salary + 1000000);
+        oldsalaries.push(emps.docs[i].data().salary);
+      }
+      setOldSalaries(oldsalaries);
+      setNewSalaries(newsalaries);
+
+      adjEmployees.splice(0, adjEmployees.length);
+
+      setEmpDocs(emps.docs);
+    })
+  }
+
+  React.useEffect(() => {
+    if(newSalaries.length > 0){
+      var count = 0;
+      setSalaryAdjustmentFields(
+        empDocs.map((emp) => {
+          count++;
+          const em = {id: emp.id, ...emp.data()} as IAuth;
+          adjEmployees.push(em.eid);
+          return {id: em.eid, component: 
+          <FormItemBeforeAfterNumber
+            index={count-1}
+            contexttitle={em.name} 
+            contextcaption={em.eid}
+            fieldname="Proposed Salary"
+            beforeFieldname="Current Salary"
+            beforeValue={em.salary}
+            unit="IDR"
+            min={1}
+            max={9999999999}
+            value={newSalaries[count-1]}
+            handleChange={handleSalaryAdjustmentChange}
+             /> 
+          } as FormItem;
+        })
+      );
+      setOpenSalaryDialog(true);
+    }
+  }, [empDocs]);
 
   const handleIssueLetterConfirm = (eid: string, reason: string) => {
     if(reason !== "UNDEFINEDREASON"){
@@ -537,7 +706,7 @@ export default function ManageTable({access, giveWarnLetter, changeWorkTime}: {a
     return (
     <div className={classes.root}>
       <Paper className={classes.paper} style={{backgroundColor: '#000'}}>
-      <EnhancedTableToolbar handleWorkingTime={handleWorkingTime} changeWorkTime={changeWorkTime} selected={selected[0]} giveWarnLetter={giveWarnLetter} handleIssueLetterOpen={handleIssueLetterOpen} handleClearSelection={handleClearSelection} searchBar={
+      <EnhancedTableToolbar adjustSalary={adjustSalary} handleAdjustSalary={e => handleSalaryAdjustment(selected)}  handleEmployeeDetails={handleViewDetails} handleWorkingTime={handleWorkingTime} changeWorkTime={changeWorkTime} selected={selected[0]} giveWarnLetter={giveWarnLetter} handleIssueLetterOpen={handleIssueLetterOpen} handleClearSelection={handleClearSelection} searchBar={
         (<SearchBar
           value={searched}
           onChange={(searchVal) => requestSearch(searchVal)}
@@ -571,7 +740,7 @@ export default function ManageTable({access, giveWarnLetter, changeWorkTime}: {a
     return (
       <div className={classes.root}>
         <Paper className={classes.paper}>
-          <EnhancedTableToolbar handleWorkingTime={handleWorkingTime} changeWorkTime={changeWorkTime}  selected={selected[0]} giveWarnLetter={giveWarnLetter} handleIssueLetterOpen={handleIssueLetterOpen} handleClearSelection={handleClearSelection} searchBar={
+          <EnhancedTableToolbar adjustSalary={adjustSalary} handleAdjustSalary={e => handleSalaryAdjustment(selected)} handleEmployeeDetails={handleViewDetails} handleWorkingTime={handleWorkingTime} changeWorkTime={changeWorkTime}  selected={selected[0]} giveWarnLetter={giveWarnLetter} handleIssueLetterOpen={handleIssueLetterOpen} handleClearSelection={handleClearSelection} searchBar={
         (<SearchBar
           value={searched}
           onChange={(searchVal) => requestSearch(searchVal)}
@@ -706,9 +875,23 @@ export default function ManageTable({access, giveWarnLetter, changeWorkTime}: {a
             Warning letter has been successfully issued!
           </Alert>
         </Snackbar>
-        <EmptyDialog title={(selEmployee ? selEmployee.ename : "loading..") + '\'s working time'} openDialog={openDetailDialog} setOpenDialog={setOpenDetailDialog} onDialogFinish={() => {}} content={
+        <EmptyDialog title={(selEmployee ? selEmployee.ename : "loading..") + '\'s working time'} openDialog={openWorktimeDialog} setOpenDialog={setOpenWorktimeDialog} onDialogFinish={() => {}} content={
           <WorkingTimeAccordion eid={selEmployee ? selEmployee.eid : "000"} manage={true}/>
         }/>
+        <EmployeeInfocard employee={fullSelEmployee ? fullSelEmployee : getAuthUser()} openDialog={openDetailsDialog} setOpenDialog={setOpenDetailsDialog} onDialogFinish={() => {}}/>
+        <FormDialog 
+          title="Create Salary Adjustment"
+          success_msg="Successfully requested salary adjustments"
+          positive_btn_label="Send Adjustment Request"
+          negative_btn_label="Cancel"
+          generic_err="Proposed salary for each selected employee must be more than 0"
+          fields={salaryAdjustmentFields}
+          openError={salaryAdjustmentError}
+          setOpenError={setSalaryAdjustmentError}
+          open={openSalaryDialog}
+          handleClose={handleCloseSalaryAdjustment}
+          handleSubmit={handleSalaryAdjustmentSubmit}
+        />
       </div>
     );
   }

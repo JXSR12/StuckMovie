@@ -125,7 +125,7 @@ function Pendings() {
               
             </Typography>
           </Box>
-          <PendingTabs/>
+          <PendingTabs auth={auth ? true : false}/>
         </div>
       </div>
     </React.Fragment>

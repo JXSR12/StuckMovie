@@ -23,7 +23,7 @@ import { App, AppManager } from '../utils/apps_manager';
 import { SidebarNav } from '../utils/sidebar_nav_manager';
 import { getAllMovies, getAllMoviesRTU, Movie } from '../utils/movies_manager';
 import { Box, CardMedia, Chip, Divider } from '@material-ui/core';
-import { getProducer, Producer } from '../utils/producers_manager';
+import { getProducer, Producer, getAllProducers } from '../utils/producers_manager';
 import { AgeRating, getAgeRating } from '../utils/agerating_manager';
 import { Genre, getGenre } from '../utils/genre_manager';
 import { ProducerInfocard } from './EmployeeCardDialog';
@@ -50,81 +50,68 @@ const useStyles = makeStyles((theme: Theme) =>
   }),
 );
 
-export function MovieCard(props: {movie : Movie}){
-    const { movie } = props;
+export function ProducerCard(props: {producer : Producer}){
+    const { producer } = props;
     const classes = useStyles();
 
     const [openProducer, setOpenProducer] = React.useState(false);
 
     return(
         <Card className={classes.root}>
-                <CardMedia
-                  className={classes.media}
-                  image={movie.poster_url}
-                  title="Poster"
-                />
                 <CardContent>
                     <Typography variant="h6" component="h2">
-                      {movie.title}
+                      {producer.name}
                     </Typography>
                     <br/>
-                    <Divider />
-                    <br/>
-                    <Grid container justifyContent="center" spacing={1}>
-                    {movie.genres.map(m => (
-                      <Grid item>
-                        <Chip size="small" label={m.name} />
-                      </Grid>
-                    ))}
-                    </Grid><br/>
                     <Divider />
                     <br/>
                     <Typography className={classes.rating} color="textSecondary" gutterBottom>
-                      <Chip size="small" label={"Age Rating"} color="primary"/>{' ' + movie.ageRating.rating}
+                      <Chip size="small" label={"Phone"} color="primary"/>{' ' + producer.phone}
                     </Typography>
                     <Typography className={classes.producer} color="textSecondary" gutterBottom>
-                      <Chip size="small" label={"Producer"} color="secondary"/> {' ' + movie.producer.name}
+                      <Chip size="small" label={"Email"} color="primary"/> {' ' + producer.email}
                     </Typography>
                 </CardContent>
                 <CardActions>
-                    <Button size="medium" onClick={e => setOpenProducer(true)}>View Producer</Button>
+                    <Button size="medium" onClick={e => setOpenProducer(true)}>View Details</Button>
                 </CardActions>
-                <ProducerInfocard producer={movie.producer} openDialog={openProducer} setOpenDialog={setOpenProducer} onDialogFinish={e => setOpenProducer(false)}/>
+                <ProducerInfocard producer={producer} openDialog={openProducer} setOpenDialog={setOpenProducer} onDialogFinish={e => setOpenProducer(false)}/>
             </Card>
     );
 }
 
-export default function MovieGridContainer(props: {searched : string, refreshList: boolean, handleSearch: any}) {
+export default function ProducerGridContainer(props: {searched : string, handleSearch: any}) {
   const classes = useStyles();
 
-  const {searched, refreshList, handleSearch} = props;
+  const {searched, handleSearch} = props;
 
-  const [movies, setMovies] = React.useState<Movie[]>([]);
+  const [producers, setProducers] = React.useState<Producer[]>([]);
+
+  const [refreshList, setRefreshList] = React.useState(false);
 
   React.useEffect(() => {
-    getAllMoviesRTU().then((movies) => {
-      setMovies(movies);
-      console.log('Retrieved all movies');
+    getAllProducers().then((prod) => {
+        setProducers(
+        prod.docs.map((pr) => {
+            return {id: pr.id, ...pr.data()} as Producer
+        }));
     });
     
   }, [refreshList]);
 
-  function filterSearch(movie){
-    const mov = movie as Movie;
-    var genrenames = [];
-    mov.genres.map(g => {
-      genrenames.push(g.name.toLowerCase());
-    })
-    return mov.title.toLowerCase().includes(searched.toLowerCase()) || mov.producer.name.toLowerCase().includes(searched.toLowerCase()) || mov.ageRating.rating.toLowerCase().includes(searched.toLowerCase()) || genrenames.includes(searched.toLowerCase() || mov.synopsis.toLowerCase().includes(searched.toLowerCase()))
+  function filterSearch(producer){
+    const prod = producer as Producer;
+
+    return prod.name.toLowerCase().includes(searched.toLowerCase()) || prod.phone.toLowerCase().includes(searched.toLowerCase()) || prod.email.toLowerCase().includes(searched.toLowerCase()) || prod.address.toLowerCase().includes(searched.toLowerCase())
   }
 
-  function MovGrid() {
+  function ProdGrid() {
     return (
         <Grid container spacing={3}>
-            <Grid container item xs={12} spacing={8}>
-                {movies.filter(filterSearch).map((movie, index) => 
-                    <Grid key={index} item xs={4}>
-                        <MovieCard movie={movie as Movie}/>
+            <Grid container item xs={12} spacing={4}>
+                {producers.filter(filterSearch).map((prod, index) => 
+                    <Grid key={index} item xs={3}>
+                        <ProducerCard producer={prod as Producer}/>
                     </Grid>
                 )}
             </Grid>
@@ -134,7 +121,7 @@ export default function MovieGridContainer(props: {searched : string, refreshLis
 
   return (
     <div className={classes.root}>
-      <MovGrid/>
+      <ProdGrid/>
     </div>
   );
 }

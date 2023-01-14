@@ -23,10 +23,11 @@ import { App, AppManager } from '../utils/apps_manager';
 import { SidebarNav } from '../utils/sidebar_nav_manager';
 import { getAllMovies, getAllMoviesRTU, Movie } from '../utils/movies_manager';
 import { Box, CardMedia, Chip, Divider } from '@material-ui/core';
-import { getProducer, Producer } from '../utils/producers_manager';
+import { getProducer, Producer, getAllProducers } from '../utils/producers_manager';
 import { AgeRating, getAgeRating } from '../utils/agerating_manager';
 import { Genre, getGenre } from '../utils/genre_manager';
-import { ProducerInfocard } from './EmployeeCardDialog';
+import { FNBMenuInfocard, ProducerInfocard } from './EmployeeCardDialog';
+import { FNBMenu, FNBMenuCategory, getAllFNBMenus } from '../utils/fnbmenu_manager';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -50,81 +51,60 @@ const useStyles = makeStyles((theme: Theme) =>
   }),
 );
 
-export function MovieCard(props: {movie : Movie}){
-    const { movie } = props;
+export function ConcessionCard(props: {concession : FNBMenu}){
+    const { concession } = props;
     const classes = useStyles();
 
-    const [openProducer, setOpenProducer] = React.useState(false);
+    const [openConcession, setOpenConcession] = React.useState(false);
 
     return(
         <Card className={classes.root}>
-                <CardMedia
-                  className={classes.media}
-                  image={movie.poster_url}
-                  title="Poster"
-                />
                 <CardContent>
                     <Typography variant="h6" component="h2">
-                      {movie.title}
+                      {concession.name}
                     </Typography>
                     <br/>
-                    <Divider />
-                    <br/>
-                    <Grid container justifyContent="center" spacing={1}>
-                    {movie.genres.map(m => (
-                      <Grid item>
-                        <Chip size="small" label={m.name} />
-                      </Grid>
-                    ))}
-                    </Grid><br/>
                     <Divider />
                     <br/>
                     <Typography className={classes.rating} color="textSecondary" gutterBottom>
-                      <Chip size="small" label={"Age Rating"} color="primary"/>{' ' + movie.ageRating.rating}
+                      <Chip size="small" label={"About"} color="primary"/>{' ' + concession.description}
                     </Typography>
                     <Typography className={classes.producer} color="textSecondary" gutterBottom>
-                      <Chip size="small" label={"Producer"} color="secondary"/> {' ' + movie.producer.name}
+                      <Chip size="small" label={"Category"} color="primary"/> {' ' + FNBMenuCategory[concession.category]}
                     </Typography>
                 </CardContent>
                 <CardActions>
-                    <Button size="medium" onClick={e => setOpenProducer(true)}>View Producer</Button>
+                    <Button size="medium" onClick={e => setOpenConcession(true)}>View Details</Button>
                 </CardActions>
-                <ProducerInfocard producer={movie.producer} openDialog={openProducer} setOpenDialog={setOpenProducer} onDialogFinish={e => setOpenProducer(false)}/>
+                <FNBMenuInfocard item={concession} openDialog={openConcession} setOpenDialog={setOpenConcession} onDialogFinish={e => setOpenConcession(false)}/>
             </Card>
     );
 }
 
-export default function MovieGridContainer(props: {searched : string, refreshList: boolean, handleSearch: any}) {
+export default function ConcessionGridContainer(props: {}) {
   const classes = useStyles();
 
-  const {searched, refreshList, handleSearch} = props;
+  const [concessions, setConcessions] = React.useState<FNBMenu[]>([]);
 
-  const [movies, setMovies] = React.useState<Movie[]>([]);
+  const [refreshList, setRefreshList] = React.useState(false);
 
   React.useEffect(() => {
-    getAllMoviesRTU().then((movies) => {
-      setMovies(movies);
-      console.log('Retrieved all movies');
+    getAllFNBMenus().then((prod) => {
+        setConcessions(
+        prod.docs.map((pr) => {
+            return {id: pr.id, ...pr.data()} as FNBMenu
+        }));
     });
     
   }, [refreshList]);
 
-  function filterSearch(movie){
-    const mov = movie as Movie;
-    var genrenames = [];
-    mov.genres.map(g => {
-      genrenames.push(g.name.toLowerCase());
-    })
-    return mov.title.toLowerCase().includes(searched.toLowerCase()) || mov.producer.name.toLowerCase().includes(searched.toLowerCase()) || mov.ageRating.rating.toLowerCase().includes(searched.toLowerCase()) || genrenames.includes(searched.toLowerCase() || mov.synopsis.toLowerCase().includes(searched.toLowerCase()))
-  }
-
-  function MovGrid() {
+  function ProdGrid() {
     return (
         <Grid container spacing={3}>
-            <Grid container item xs={12} spacing={8}>
-                {movies.filter(filterSearch).map((movie, index) => 
-                    <Grid key={index} item xs={4}>
-                        <MovieCard movie={movie as Movie}/>
+            <Grid container item xs={12} spacing={4}>
+                {concessions.map((conc, index) => 
+                    <Grid key={index} item xs={3}>
+                        <ConcessionCard concession={conc as FNBMenu}/>
                     </Grid>
                 )}
             </Grid>
@@ -134,7 +114,7 @@ export default function MovieGridContainer(props: {searched : string, refreshLis
 
   return (
     <div className={classes.root}>
-      <MovGrid/>
+      <ProdGrid/>
     </div>
   );
 }

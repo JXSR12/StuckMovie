@@ -20,6 +20,7 @@ import { ToggleButton, ToggleButtonGroup } from '@material-ui/lab';
 import { Request } from '../utils/requests_manager';
 import { FiringRequest, FRInfocard, FRRequestListItem, getAllFiringRequests, getFiringRequest, getFiringRequests, updateFiringRequest } from '../utils/firingrequest_manager';
 import { getAllLeaveRequests, getLeaveRequest, getLeaveRequests, LeaveRequest, LRInfocard, LRRequestListItem, updateLeaveRequest } from '../utils/leaverequest_manager';
+import { FNInfocard, FNRequestListItem, FundRequest, getFundRequest, getFundRequests } from '../utils/fundrequests_manager';
 
 interface TabPanelProps {
   title: string;
@@ -75,6 +76,13 @@ function GenerateList(props: GenerateListProps) {
           <FRRequestListItem request={item as FiringRequest} handleOpen={handleOpenDialog}/>
         )}
       </div>);
+  }else if(requestType === RequestType.FundRequest){
+    return(
+      <div>
+        {items.map(item => 
+          <FNRequestListItem request={item as FundRequest} handleOpen={handleOpenDialog}/>
+        )}
+      </div>);
   }
 }
 
@@ -125,9 +133,10 @@ export enum RequestType{
     WarningLetter,
     LeaveRequest,
     FiringRequest,
+    FundRequest
 }
 
-export default function RequestTabs(props: {employee: IAuth, requestType: RequestType, refreshList: boolean}) {
+export default function RequestTabs(props: {employee: IAuth, requestType: RequestType, refreshList: boolean, auth: boolean}) {
   const classes = useStyles();
   const [value, setValue] = React.useState('one');
   const [openDialog, setOpenDialog] = React.useState(false);
@@ -136,7 +145,7 @@ export default function RequestTabs(props: {employee: IAuth, requestType: Reques
   const [pwd, setPwd] = React.useState<string>('');
   const [reqItemId, setReqItemId] = React.useState<string>('');
 
-  const {employee, requestType, refreshList} = props;
+  const {employee, requestType, refreshList, auth} = props;
 
   const [stepperItems, setStepperItems] = React.useState<StepperStepItem[]>([]);
 
@@ -171,8 +180,18 @@ export default function RequestTabs(props: {employee: IAuth, requestType: Reques
               }));
             console.log('Retrieved all firing requests for employee');
           });
-      
-    }
+    }else if(requestType === RequestType.FundRequest){
+      getFundRequests(employee.dept_id).then((data) => {
+          setRequests(
+            data.docs.map((doc) => {
+              const request = {id: doc.id, ...doc.data()} as FundRequest;
+              console.log(request);
+              return request;
+            }));
+          console.log('Retrieved all fund requests for employee\'s department');
+        });
+    
+  }
     
   }, [refreshList]);
 
@@ -196,7 +215,13 @@ export default function RequestTabs(props: {employee: IAuth, requestType: Reques
             setStepperItems([viewRequestStepperItem(<FRInfocard request={request}/>)]);
             setOpenDialog(true);
         });
-    }
+    }else if(requestType === RequestType.FundRequest){
+      getFundRequest(id).then((doc) => {
+          const request = {id: doc.id, ...doc.data()} as FundRequest;
+          setStepperItems([viewRequestStepperItem(<FNInfocard request={request}/>)]);
+          setOpenDialog(true);
+      });
+  }
   }
 
   const handleChange = (event: React.ChangeEvent<{}>, newValue: string) => {
@@ -206,7 +231,7 @@ export default function RequestTabs(props: {employee: IAuth, requestType: Reques
   const handleFinishDialog = () => {
   }
 
-  const requestName = requestType === RequestType.WarningLetter ? "warning letter" : requestType === RequestType.LeaveRequest ? "leave request" : "firing request";
+  const requestName = requestType === RequestType.WarningLetter ? "warning letter" : requestType === RequestType.LeaveRequest ? "leave request" : requestType === RequestType.FiringRequest ? "firing request" : "fund request";
 
   return (
     <div className={classes.root}>
@@ -225,7 +250,6 @@ export default function RequestTabs(props: {employee: IAuth, requestType: Reques
         <TabPanel requestType={requestType} handleOpenDialog={handleOpenDialog} items={requests.filter(r => r.status === RequestStatus.Declined)} title={'Your declined ' + requestName + 's'} value={value} index="two"/>
         <TabPanel requestType={requestType} handleOpenDialog={handleOpenDialog} items={requests.filter(r => r.status === RequestStatus.Pending)} title={'Your pending ' + requestName + 's'} value={value} index="three"/>
       
-
       <StepperDialog openDialog={openDialog} setOpenDialog={setOpenDialog} onDialogFinish={handleFinishDialog} items={stepperItems}/>
     </div>
   );

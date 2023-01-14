@@ -1,9 +1,9 @@
 {
   "private": true,
-  "name": "my-nextron-app",
-  "description": "My application description",
-  "version": "1.0.0",
-  "author": "Yoshihide Shiono <shiono.yoshihide@gmail.com>",
+  "name": "sitm-system",
+  "description": "Stuck In The Movie Cinemas Management System",
+  "version": "7.7.7",
+  "author": "Jason Adiwijaya <adiwijayajason@gmail.com>",
   "main": "app/background.js",
   "scripts": {
     "dev": "nextron",
@@ -17,6 +17,7 @@
     "@material-ui/icons": "^4.11.3",
     "@material-ui/lab": "^4.0.0-alpha.61",
     "@material-ui/pickers": "^3.3.10",
+    "@mui/x-data-grid": "^4.0.0",
     "@types/react-currency-format": "^1.0.0",
     "@types/react-input-mask": "^3.0.2",
     "bcryptjs": "^2.4.3",
@@ -32,7 +33,12 @@
     "qrcode-generator": "^1.4.4",
     "react-chartjs-2": "^5.1.0",
     "react-currency-format": "^1.1.0",
-    "react-number-format": "^5.1.2"
+    "react-live-clock": "^6.1.1",
+    "react-moment": "^1.1.2",
+    "react-number-format": "^5.1.2",
+    "react-qr-code": "^2.0.11",
+    "react-seat-picker": "^1.5.3",
+    "receiptio": "^1.7.0"
   },
   "devDependencies": {
     "@material-ui/core": "^4.12.4",
